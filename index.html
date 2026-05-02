@@ -553,27 +553,22 @@ function setupListeners(){
 window.setPhase=async n=>{currentPhase=n;updateGMPhaseUI(n);await updateDoc(STATE_REF,{phase:n});};
 window.startGame=async()=>{await setDoc(STATE_REF,{gameStatus:'playing',phase:currentPhase},{merge:true});};
 window.replayGame=async()=>{
-    // 모든 플레이어 eliminated 초기화 → 대기실로 복귀
     const snap=await getDocs(PLAYERS_COL);
     const batch=writeBatch(db);
     snap.forEach(d=>batch.update(d.ref,{eliminated:false,x:40+Math.random()*20,y:40+Math.random()*20}));
     await batch.commit();
     await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
-    // GM 상태 리셋
     Object.values(allPlayers).forEach(p=>p.eliminated=false);
     currentPhase=1; updateGMPhaseUI(1); renderGMList();
 };
+window.resetGame=async()=>{
     if(!confirm('모든 플레이어를 퇴장시키고 완전 초기화합니다. 계속하시겠습니까?'))return;
-    // ① 먼저 reset 신호 전파 → 모든 접속 클라이언트가 이름 입력 화면으로 돌아감
     await setDoc(STATE_REF,{gameStatus:'reset',phase:1});
-    // ② 1초 후 플레이어 문서 전체 삭제
     setTimeout(async()=>{
         const snap=await getDocs(PLAYERS_COL);
         const batch=writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
-        // ③ 상태를 lobby로 전환
         await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
     },1000);
-    // GM 자체 상태 리셋
     allPlayers={}; colorIdx=0; currentPhase=1; updateGMPhaseUI(1); renderGMList();
 };
 window.exitGM=()=>{isGM=false;showScreen('name-screen');};
