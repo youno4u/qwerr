@@ -3,469 +3,558 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>불가항력적 은혜 - 플레이어</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>불가항력적 은혜</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #1a202c; touch-action: none; font-family: 'Malgun Gothic', sans-serif; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        .hidden-safe { display: none !important; }
-        @keyframes pulse-glow {
-            0% { text-shadow: 0 0 10px #fbbf24; }
-            50% { text-shadow: 0 0 30px #f59e0b, 0 0 40px #ef4444; }
-            100% { text-shadow: 0 0 10px #fbbf24; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: #0f172a; color: white;
+            overflow: hidden; width: 100vw; height: 100vh;
+            touch-action: none; user-select: none;
         }
-        .text-glow { animation: pulse-glow 2s infinite; }
+        .screen {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 1.2rem; padding: 2rem;
+        }
+        .screen.hidden { display: none; }
+
+        /* ── 입장 화면 ── */
+        #name-screen { background: linear-gradient(160deg,#0f172a 0%,#1e1b4b 100%); z-index:100; }
+        .logo { font-size:5.5rem; font-weight:900; color:#eab308;
+            text-shadow:0 0 40px rgba(234,179,8,0.6); letter-spacing:-3px; line-height:1; }
+        .logo-sub { font-size:1.2rem; font-weight:700; color:#475569; margin-top:-0.5rem; }
+        #name-input {
+            width:100%; max-width:300px; padding:1rem 1.2rem; font-size:1.4rem;
+            font-family:'Noto Sans KR',sans-serif; background:#1e293b;
+            border:2px solid #334155; border-radius:1rem; color:white;
+            text-align:center; outline:none;
+        }
+        #name-input:focus { border-color:#eab308; box-shadow:0 0 0 3px rgba(234,179,8,0.15); }
+        #join-btn {
+            width:100%; max-width:300px; padding:1rem;
+            font-size:1.2rem; font-weight:900; font-family:'Noto Sans KR',sans-serif;
+            background:linear-gradient(135deg,#eab308,#f59e0b);
+            color:#0f172a; border:none; border-radius:1rem; cursor:pointer;
+        }
+        #join-btn:active { transform:scale(0.97); }
+        #gm-gear-btn {
+            background:none; border:none; cursor:pointer;
+            color:#1e293b; font-size:1.4rem; margin-top:-0.3rem;
+            transition:color 0.2s, transform 0.3s; padding:0.3rem;
+        }
+        #gm-gear-btn:hover { color:#334155; transform:rotate(60deg); }
+
+        /* ── GM 비번 모달 ── */
+        #pw-modal {
+            position:fixed; inset:0; background:rgba(0,0,0,0.88);
+            display:none; align-items:center; justify-content:center;
+            z-index:300; backdrop-filter:blur(6px);
+        }
+        #pw-modal.visible { display:flex; }
+        .pw-box {
+            background:#1e293b; border:1px solid #334155; border-radius:1.5rem;
+            padding:2rem 1.8rem; width:280px;
+            display:flex; flex-direction:column; gap:1rem; align-items:center; text-align:center;
+        }
+        .pw-title { font-size:1rem; font-weight:700; color:#94a3b8; }
+        #pw-input {
+            width:100%; padding:0.8rem; font-size:1.8rem;
+            font-family:'Noto Sans KR',sans-serif; background:#0f172a;
+            border:2px solid #334155; border-radius:0.8rem; color:white;
+            text-align:center; outline:none; letter-spacing:0.4em;
+        }
+        #pw-input:focus { border-color:#eab308; }
+        .pw-btns { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; width:100%; }
+        .pw-confirm { padding:0.7rem; font-size:1rem; font-weight:900;
+            font-family:'Noto Sans KR',sans-serif; background:#eab308;
+            color:#0f172a; border:none; border-radius:0.6rem; cursor:pointer; }
+        .pw-cancel { padding:0.7rem; font-size:1rem; font-weight:700;
+            font-family:'Noto Sans KR',sans-serif; background:#1e293b;
+            color:#64748b; border:1px solid #334155; border-radius:0.6rem; cursor:pointer; }
+        #pw-error { font-size:0.8rem; color:#ef4444; min-height:0.9rem; }
+
+        /* ── GM 화면 ── */
+        #gm-screen {
+            background:#0d1526; z-index:200;
+            justify-content:flex-start; padding:0; overflow-y:auto;
+        }
+        .gm-header {
+            width:100%; padding:1.2rem 1.5rem; flex-shrink:0;
+            background:#0f172a; border-bottom:1px solid #1e293b;
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .gm-header-title { font-size:1.3rem; font-weight:900; color:#eab308; }
+        .gm-header-sub   { font-size:0.75rem; color:#475569; margin-top:1px; }
+        .gm-body { width:100%; padding:1.2rem; display:flex; flex-direction:column; gap:1.2rem; }
+
+        .stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:0.6rem; }
+        .stat-card { background:#1e293b; border-radius:0.8rem; padding:0.8rem; text-align:center; }
+        .stat-num { font-size:2rem; font-weight:900; }
+        .stat-lbl { font-size:0.7rem; color:#64748b; margin-top:1px; }
+
+        .section-label {
+            font-size:0.7rem; font-weight:700; color:#475569;
+            letter-spacing:0.1em; text-transform:uppercase;
+            border-bottom:1px solid #1e293b; padding-bottom:0.4rem;
+        }
+
+        .phase-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:0.5rem; }
+        .phase-btn {
+            padding:0.65rem 0; font-size:0.85rem; font-weight:900;
+            font-family:'Noto Sans KR',sans-serif; background:#1e293b;
+            color:#475569; border:1px solid #334155; border-radius:0.7rem; cursor:pointer;
+            transition:all 0.15s;
+        }
+        .phase-btn.active { color:#0f172a; border-color:transparent; }
+        .phase-btn:active { transform:scale(0.95); }
+
+        #gm-phase-info {
+            padding:0.65rem 1rem; background:#0f172a; border-radius:0.7rem;
+            font-size:0.9rem; font-weight:700; transition:color 0.4s;
+        }
+
+        .action-row { display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; }
+        .btn-start { padding:0.9rem; font-size:1rem; font-weight:900;
+            font-family:'Noto Sans KR',sans-serif;
+            background:linear-gradient(135deg,#16a34a,#15803d);
+            color:white; border:none; border-radius:0.8rem; cursor:pointer; }
+        .btn-reset { padding:0.9rem; font-size:1rem; font-weight:700;
+            font-family:'Noto Sans KR',sans-serif; background:#1e293b;
+            color:#64748b; border:1px solid #334155; border-radius:0.8rem; cursor:pointer; }
+        .btn-start:active,.btn-reset:active { transform:scale(0.97); }
+
+        .player-list { display:flex; flex-direction:column; gap:0.4rem; max-height:260px; overflow-y:auto; }
+        .player-list::-webkit-scrollbar { width:3px; }
+        .player-list::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+        .player-item {
+            display:flex; align-items:center; gap:0.6rem;
+            padding:0.5rem 0.8rem; background:#1e293b; border-radius:0.5rem;
+            font-size:0.9rem; transition:opacity 0.3s;
+        }
+        .player-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .player-name { flex:1; font-weight:700; }
+        .player-status { font-size:0.75rem; color:#475569; }
+        .player-item.elim { opacity:0.45; }
+        .player-item.elim .player-name { text-decoration:line-through; color:#64748b; }
+
+        /* ── 대기실 ── */
+        #lobby-screen { background:linear-gradient(160deg,#0f172a 0%,#1e1b4b 100%); z-index:90; }
+        .lobby-cross { font-size:3rem; color:#334155; animation:cpulse 2s ease-in-out infinite; }
+        @keyframes cpulse { 0%,100%{opacity:0.3;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)} }
+
+        /* ── 게임 캔버스 ── */
+        #game-canvas { display:none; position:fixed; inset:0; width:100%; height:100%; }
+        #game-canvas.visible { display:block; }
+
+        #phase-banner {
+            position:fixed; top:1rem; left:50%; transform:translateX(-50%);
+            background:rgba(0,0,0,0.8); border:1.5px solid #334155;
+            border-radius:2rem; padding:0.4rem 1.3rem;
+            font-size:0.9rem; font-weight:700; backdrop-filter:blur(10px);
+            z-index:50; display:none; white-space:nowrap;
+            transition:color 0.5s,border-color 0.5s;
+        }
+        #swipe-hint {
+            position:fixed; bottom:1.5rem; left:0; right:0;
+            text-align:center; z-index:50; pointer-events:none;
+            font-size:0.8rem; color:rgba(255,255,255,0.35); display:none;
+        }
+
+        /* ── 탈락 화면 ── */
+        #eliminated-screen { background:radial-gradient(circle at center,#1c0a00 0%,#0f172a 100%); z-index:200; }
+        .elim-icon { font-size:4.5rem; animation:eglow 2s ease-in-out infinite alternate; }
+        @keyframes eglow { from{filter:drop-shadow(0 0 8px #eab308)} to{filter:drop-shadow(0 0 35px #fef08a)} }
+        .elim-title { font-size:2.5rem; font-weight:900; color:#fef08a; text-align:center; }
+        .elim-sub { font-size:1rem; color:rgba(255,255,255,0.75); text-align:center; line-height:1.7; }
+        .elim-verse {
+            padding:1rem 1.5rem; border:1px solid rgba(234,179,8,0.25);
+            border-radius:1rem; background:rgba(234,179,8,0.07);
+            font-size:0.9rem; color:#fde68a; text-align:center; line-height:1.6;
+        }
     </style>
 </head>
-<body class="text-white select-none">
+<body>
 
-    <!-- 로그인 (학생 이름 입력) 화면 -->
-    <div id="login-view" class="absolute inset-0 flex flex-col items-center justify-center z-40 bg-gray-900 p-6">
-        <h1 class="text-4xl font-black mb-10 text-yellow-400 text-glow">불가항력적 은혜</h1>
-        
-        <div class="w-full max-w-sm flex flex-col items-center">
-            <label class="text-gray-400 mb-2 font-bold">나의 이름은?</label>
-            <input type="text" id="player-name" class="w-full px-6 py-4 rounded-xl text-black font-bold text-2xl text-center mb-6 focus:outline-none focus:ring-4 focus:ring-yellow-400" placeholder="이름 입력" maxlength="8">
-            <button onclick="window.joinGame()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-2xl rounded-xl shadow-lg transition">입장하기</button>
-        </div>
+<!-- ① 메인 입장 화면 -->
+<div id="name-screen" class="screen">
+    <div class="logo">TULIP</div>
+    <div class="logo-sub">불가항력적 은혜</div>
+    <p style="color:#334155;font-size:0.85rem;text-align:center;line-height:1.7;">
+        십자가가 당신을 끌어당깁니다<br>스와이프로 버텨보세요!
+    </p>
+    <input id="name-input" type="text" placeholder="이름 입력 (최대 5자)" maxlength="5" autocomplete="off" autocorrect="off">
+    <button id="join-btn">입장하기</button>
+    <button id="gm-gear-btn" title="GM 입장">⚙</button>
+</div>
 
-        <div id="loading-msg" class="mt-6 text-yellow-400 animate-pulse hidden-safe">서버에 연결 중입니다...</div>
-    </div>
-
-    <!-- 대기 화면 -->
-    <div id="waiting-view" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-gray-900 p-6 hidden-safe text-center">
-        <div class="text-6xl mb-6 animate-bounce">❤️</div>
-        <h2 class="text-3xl font-bold text-white mb-4">준비 완료!</h2>
-        <p class="text-gray-400 text-xl mb-10">목사님이 게임을 시작할 때까지<br>기다려주세요.</p>
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-500"></div>
-    </div>
-
-    <!-- 게임 결과 (사망) 화면 -->
-    <div id="dead-view" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-red-900/90 backdrop-blur-md p-6 hidden-safe text-center">
-        <h1 class="text-6xl font-black mb-4 text-yellow-400 text-glow">은혜에 붙잡힘!</h1>
-        <p class="text-2xl text-gray-200 mb-2">나의 버틴 시간</p>
-        <p id="result-time" class="text-7xl font-black text-white mb-10">0.0초</p>
-        <p class="text-gray-300 text-lg">앞의 스크린에서 순위를 확인하세요!<br>잠시 후 대기실로 이동합니다.</p>
-    </div>
-
-    <!-- 인게임 UI (오버레이) -->
-    <div id="ingame-ui" class="absolute top-0 left-0 w-full p-4 pointer-events-none z-20 hidden-safe flex justify-between">
-        <div class="bg-gray-800/80 p-3 rounded-lg border border-gray-600 shadow-lg">
-            <span class="text-sm text-gray-400 block font-bold">라운드</span>
-            <span class="text-2xl font-black text-blue-400" id="ui-round">1</span>
-        </div>
-        <div class="bg-gray-800/80 p-3 rounded-lg border border-gray-600 shadow-lg text-right">
-            <span class="text-sm text-yellow-200 block font-bold">버틴 시간</span>
-            <span class="text-2xl font-black text-yellow-400" id="ui-time">0.0초</span>
+<!-- GM 비번 모달 -->
+<div id="pw-modal">
+    <div class="pw-box">
+        <div class="pw-title">⚙ GM 입장</div>
+        <input id="pw-input" type="password" placeholder="••••" maxlength="8" inputmode="numeric">
+        <div id="pw-error"></div>
+        <div class="pw-btns">
+            <button class="pw-confirm" id="pw-confirm">확인</button>
+            <button class="pw-cancel"  id="pw-cancel">취소</button>
         </div>
     </div>
+</div>
 
-    <!-- 게임 캔버스 -->
-    <canvas id="gameCanvas" class="absolute inset-0 z-10 hidden-safe"></canvas>
+<!-- ② GM 화면 -->
+<div id="gm-screen" class="screen hidden">
+    <div class="gm-header">
+        <div>
+            <div class="gm-header-title">⚙ GM 제어판</div>
+            <div class="gm-header-sub">불가항력적 은혜 — TULIP</div>
+        </div>
+        <button onclick="exitGM()" style="background:none;border:none;color:#475569;font-size:1.4rem;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div class="gm-body">
+        <div class="stat-row">
+            <div class="stat-card"><div class="stat-num" id="gm-total" style="color:#60a5fa;">0</div><div class="stat-lbl">접속</div></div>
+            <div class="stat-card"><div class="stat-num" id="gm-alive" style="color:#4ade80;">0</div><div class="stat-lbl">생존</div></div>
+            <div class="stat-card"><div class="stat-num" id="gm-elim"  style="color:#facc15;">0</div><div class="stat-lbl">사로잡힘</div></div>
+        </div>
 
-    <!-- ========================================== -->
-    <!-- GM 비밀번호 모달 -->
-    <div id="gm-password-modal" class="absolute inset-0 flex items-center justify-center z-[100] bg-black/80 hidden-safe p-6">
-        <div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 w-full max-w-sm text-center">
-            <h2 class="text-2xl font-bold text-white mb-4">진행자(GM) 인증</h2>
-            <input type="password" id="gm-password-input" class="w-full px-4 py-3 rounded text-black text-center text-xl mb-4" placeholder="비밀번호">
-            <div class="flex gap-2">
-                <button onclick="window.hideGmModal()" class="flex-1 py-3 bg-gray-600 rounded font-bold text-white">취소</button>
-                <button onclick="window.checkGmPassword()" class="flex-1 py-3 bg-red-600 rounded font-bold text-white">확인</button>
-            </div>
+        <div class="section-label">단계 선택</div>
+        <div class="phase-grid">
+            <button class="phase-btn" id="gpb1" onclick="setPhase(1)">1단계</button>
+            <button class="phase-btn" id="gpb2" onclick="setPhase(2)">2단계</button>
+            <button class="phase-btn" id="gpb3" onclick="setPhase(3)">3단계</button>
+            <button class="phase-btn" id="gpb4" onclick="setPhase(4)">4단계</button>
+            <button class="phase-btn" id="gpb5" onclick="setPhase(5)">5단계</button>
+        </div>
+        <div id="gm-phase-info" style="color:#475569;">대기 중</div>
+
+        <div class="section-label">게임 제어</div>
+        <div class="action-row">
+            <button class="btn-start" onclick="startGame()">▶ 게임 시작</button>
+            <button class="btn-reset" onclick="resetGame()">↺ 초기화</button>
+        </div>
+
+        <div class="section-label">접속 중인 심령</div>
+        <div class="player-list" id="gm-player-list">
+            <div style="color:#334155;font-size:0.85rem;text-align:center;padding:0.5rem;">아직 없습니다</div>
         </div>
     </div>
+</div>
 
-    <!-- GM 톱니바퀴 (우측 하단 숨김) -->
-    <button onclick="window.showGmModal()" class="absolute bottom-4 right-4 text-gray-800 hover:text-gray-600 z-50 p-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-    </button>
+<!-- ③ 대기실 -->
+<div id="lobby-screen" class="screen hidden">
+    <div class="logo" style="font-size:4rem;">TULIP</div>
+    <div class="lobby-cross">✝</div>
+    <p id="lobby-greeting" style="color:#eab308;font-size:1.6rem;font-weight:900;"></p>
+    <p style="color:#475569;font-size:0.85rem;text-align:center;">선생님이 시작하면<br>자동으로 게임이 시작됩니다</p>
+    <p id="lobby-count" style="color:#1e293b;font-size:0.8rem;"></p>
+</div>
 
-    <!-- GM 컨트롤 뷰 -->
-    <div id="gm-view" class="absolute inset-0 bg-gray-900 p-6 hidden-safe z-[60] overflow-y-auto">
-        <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-            <h1 class="text-3xl font-black text-red-400">👑 진행자 패널</h1>
-            <button onclick="window.closeGmView()" class="px-4 py-2 bg-gray-700 rounded font-bold">닫기</button>
-        </div>
-        
-        <div class="bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border border-gray-600">
-            <h2 class="text-xl font-bold mb-4 text-gray-300">게임 통제</h2>
-            <div class="flex items-center gap-4 mb-6">
-                <span class="text-lg">진행할 라운드:</span>
-                <input type="number" id="gm-round-input" value="1" min="1" class="w-24 p-3 text-black font-bold text-center text-xl rounded">
-            </div>
-            
-            <div class="p-4 rounded mb-6 text-center border-2 border-gray-700" id="gm-status-box">
-                <p id="gm-status-text" class="font-bold text-2xl text-yellow-400">상태: 대기 중 ⏳</p>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="window.gmStartRound()" class="p-4 bg-green-600 hover:bg-green-500 rounded font-bold text-xl shadow">▶️ 라운드 시작</button>
-                <button onclick="window.gmEndRound()" class="p-4 bg-yellow-600 hover:bg-yellow-500 rounded font-bold text-xl shadow">⏹️ 라운드 강제종료</button>
-            </div>
-        </div>
+<!-- ④ 게임 캔버스 -->
+<canvas id="game-canvas"></canvas>
+<div id="phase-banner">1단계</div>
+<div id="swipe-hint">✋ 십자가 반대 방향으로 스와이프!</div>
 
-        <div class="bg-red-900/30 p-6 rounded-xl border border-red-800 mt-8">
-            <h2 class="text-xl font-bold mb-4 text-red-400">데이터 관리</h2>
-            <button onclick="window.gmClearLeaderboard()" class="w-full p-4 bg-red-700 hover:bg-red-600 rounded font-bold text-lg shadow">🗑️ 전체 랭킹 기록 삭제</button>
-        </div>
+<!-- ⑤ 탈락 -->
+<div id="eliminated-screen" class="screen hidden">
+    <div class="elim-icon">✝</div>
+    <div class="elim-title">사로잡혔습니다</div>
+    <div class="elim-sub">은혜를 이길 수 없었습니다<br>이것이 바로 복음입니다</div>
+    <div class="elim-verse">
+        "아버지께서 내게 주시는 자는<br>다 내게로 올 것이요"<br>
+        <span style="font-size:0.8rem;color:#a78bfa;">— 요한복음 6:37</span>
     </div>
+</div>
 
-    <!-- 로직 스크립트 -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+<script type="module">
+import { initializeApp }   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import {
+    getFirestore, doc, setDoc, updateDoc, onSnapshot,
+    collection, writeBatch, getDocs, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // 1. UI 이벤트 바인딩 최우선 등록 (스크립트 멈춤 방지)
-        // ==========================================
-        window.showGmModal = () => {
-            document.getElementById('gm-password-input').value = '';
-            document.getElementById('gm-password-input').placeholder = '비밀번호';
-            document.getElementById('gm-password-input').classList.remove('border-red-500', 'border-2');
-            document.getElementById('gm-password-modal').classList.remove('hidden-safe');
-        };
-        
-        window.hideGmModal = () => document.getElementById('gm-password-modal').classList.add('hidden-safe');
-        
-        window.checkGmPassword = () => {
-            const passInput = document.getElementById('gm-password-input');
-            if(passInput.value === '1004') {
-                window.hideGmModal();
-                isGmMode = true;
-                document.getElementById('gm-view').classList.remove('hidden-safe');
-                handleStateChange(); 
-            } else {
-                passInput.value = '';
-                passInput.placeholder = '❌ 비밀번호가 틀렸습니다';
-                passInput.classList.add('border-red-500', 'border-2');
-            }
-        };
+const FB = initializeApp({
+    apiKey:"AIzaSyCfyjgtiDVD4Wsd9iGb9tEdrOGFYxxN2Tw",
+    authDomain:"kingdomgenius.firebaseapp.com",
+    projectId:"kingdomgenius",
+    storageBucket:"kingdomgenius.firebasestorage.app",
+    messagingSenderId:"385557748196",
+    appId:"1:385557748196:web:457b999a38e4982f188ff1"
+});
+const auth = getAuth(FB);
+const db   = getFirestore(FB);
+const STATE_REF   = doc(db,'kingdom_genius_games','tulip_ii_room','data','state');
+const PLAYERS_COL = collection(db,'kingdom_genius_games','tulip_ii_room','players');
+const playerRef   = uid => doc(db,'kingdom_genius_games','tulip_ii_room','players',uid);
 
-        window.closeGmView = () => {
-            isGmMode = false;
-            document.getElementById('gm-view').classList.add('hidden-safe');
-        };
+const PHASES = [null,
+    {pull:0.0005,damp:0.91,crossR:5, elimR:4, color:'#60a5fa',label:'1단계 — 희미한 끌림'},
+    {pull:0.0016,damp:0.89,crossR:11,elimR:9, color:'#a78bfa',label:'2단계 — 은혜의 중력'},
+    {pull:0.0048,damp:0.87,crossR:20,elimR:16,color:'#f472b6',label:'3단계 — 강렬한 이끌림'},
+    {pull:0.0130,damp:0.84,crossR:31,elimR:26,color:'#fb923c',label:'4단계 — 필사적 저항'},
+    {pull:0.0900,damp:0.78,crossR:45,elimR:39,color:'#facc15',label:'5단계 — 불가항력!'},
+];
+const COLORS=['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#6366f1','#ec4899','#14b8a6','#84cc16','#f43f5e'];
 
-        window.joinGame = () => {
-            const input = document.getElementById('player-name').value.trim();
-            if(!input) return;
-            myName = input;
-            
-            document.getElementById('login-view').classList.add('hidden-safe');
-            initCanvas();
+let myUid=null, myName='', isGM=false;
+let gameStatus='lobby', currentPhase=1;
+let isEliminated=false, listenersSetup=false;
+let pos={x:50,y:50}, vel={x:0,y:0};
+let lastTs=null, rafId=null, lastSync=0;
+let allPlayers={}, colorIdx=0;
 
-            if (globalState.status === 'playing') {
-                currentPlayId = globalState.startTime;
-                startLocalGame();
-            } else {
-                document.getElementById('waiting-view').classList.remove('hidden-safe');
-            }
-        };
+const canvas = document.getElementById('game-canvas');
+const ctx    = canvas.getContext('2d');
+function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize',resize); resize();
 
-        // ==========================================
-        // 2. Firebase 안전 초기화 및 변수 선언
-        // ==========================================
-        let app, auth, db;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'grace-game-v2';
-        
-        let firebaseConfig = { apiKey: "dummy" };
-        try {
-            if (typeof __firebase_config !== 'undefined') {
-                firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-            }
-        } catch (e) {
-            console.error("Config Parsing Error:", e);
+// ── 스와이프 ─────────────────────────────────────────
+let touchStart=null;
+canvas.addEventListener('touchstart',e=>{e.preventDefault();touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:false});
+canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    if(!touchStart||isEliminated||gameStatus!=='playing')return;
+    applySwipe(e.changedTouches[0].clientX-touchStart.x,e.changedTouches[0].clientY-touchStart.y);
+    touchStart=null;
+},{passive:false});
+canvas.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+let ms=null;
+canvas.addEventListener('mousedown',e=>{ms={x:e.clientX,y:e.clientY};});
+canvas.addEventListener('mouseup',e=>{
+    if(!ms||isEliminated||gameStatus!=='playing')return;
+    applySwipe(e.clientX-ms.x,e.clientY-ms.y); ms=null;
+});
+function applySwipe(dx,dy){
+    const d=Math.sqrt(dx*dx+dy*dy); if(d<8)return;
+    const p=Math.min(d/80,1.0)*11;
+    vel.x+=dx/d*p; vel.y+=dy/d*p;
+    canvas.style.filter='brightness(1.4)';
+    setTimeout(()=>{canvas.style.filter='';},80);
+}
+
+// ── 게임 루프 ─────────────────────────────────────────
+function gameLoop(ts){
+    if(!lastTs)lastTs=ts;
+    const dt=Math.min((ts-lastTs)/16.67,3); lastTs=ts;
+    const W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,S=Math.min(W,H);
+    const cfg=PHASES[currentPhase];
+
+    ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
+
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,(cfg.crossR/100)*S*2.5);
+    g.addColorStop(0,cfg.color+'45'); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    if(currentPhase===5){
+        const w=(ts/600)%1;
+        ctx.save();
+        ctx.strokeStyle=`rgba(250,204,21,${0.5-w*0.5})`;
+        ctx.lineWidth=3; ctx.shadowBlur=25; ctx.shadowColor='#facc15';
+        ctx.beginPath(); ctx.arc(cx,cy,(cfg.crossR/100)*S*0.9+w*S*0.5,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
+    }
+
+    const cp=(cfg.crossR/100)*S, th=Math.max(cp*0.22,5);
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.shadowBlur=currentPhase>=4?90:35; ctx.shadowColor=cfg.color;
+    ctx.fillStyle=cfg.color;
+    ctx.fillRect(-th/2,-cp,th,cp*2);
+    ctx.fillRect(-cp*0.65,-th/2,cp*1.3,th);
+    ctx.restore();
+
+    if(gameStatus==='playing'&&!isEliminated){
+        vel.x+=(50-pos.x)*cfg.pull*dt; vel.y+=(50-pos.y)*cfg.pull*dt;
+        const df=Math.pow(cfg.damp,dt); vel.x*=df; vel.y*=df;
+        pos.x+=vel.x*dt; pos.y+=vel.y*dt;
+        pos.x=Math.max(1,Math.min(99,pos.x)); pos.y=Math.max(1,Math.min(99,pos.y));
+        if(Math.sqrt((pos.x-50)**2+(pos.y-50)**2)<cfg.elimR){eliminate();return;}
+        const now=Date.now();
+        if(now-lastSync>250){ lastSync=now; updateDoc(playerRef(myUid),{x:pos.x,y:pos.y}).catch(()=>{}); }
+    }
+
+    if(!isEliminated){
+        const px=(pos.x/100)*W, py=(pos.y/100)*H;
+        const adx=cx-px,ady=cy-py,ad=Math.sqrt(adx*adx+ady*ady);
+        if(ad>40){
+            ctx.save(); ctx.translate(px,py); ctx.rotate(Math.atan2(ady,adx));
+            ctx.strokeStyle=cfg.color+'55'; ctx.lineWidth=1.5; ctx.setLineDash([4,5]);
+            ctx.beginPath(); ctx.moveTo(22,0); ctx.lineTo(Math.min(ad*0.45,65),0); ctx.stroke();
+            ctx.restore();
         }
+        ctx.save();
+        ctx.shadowBlur=18; ctx.shadowColor='#ef4444';
+        ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(px,py+5,9,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#fca5a5'; ctx.beginPath(); ctx.arc(px,py-7,6,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur=0;
+        const nw=myName.length*8+14;
+        ctx.fillStyle='rgba(0,0,0,0.65)';
+        ctx.beginPath();
+        if(ctx.roundRect)ctx.roundRect(px-nw/2,py+16,nw,16,4); else ctx.rect(px-nw/2,py+16,nw,16);
+        ctx.fill();
+        ctx.fillStyle='white'; ctx.font='bold 10px Noto Sans KR';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(myName,px,py+24);
+        ctx.restore();
+    }
+    rafId=requestAnimationFrame(gameLoop);
+}
 
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            console.error("Firebase Init Error:", e);
+async function eliminate(){
+    if(isEliminated)return; isEliminated=true;
+    if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+    showScreen('eliminated-screen');
+    document.getElementById('phase-banner').style.display='none';
+    document.getElementById('swipe-hint').style.display='none';
+    canvas.classList.remove('visible');
+    try{await updateDoc(playerRef(myUid),{eliminated:true,x:50,y:50});}catch(_){}
+}
+
+function beginPlay(){
+    const angle=Math.random()*Math.PI*2,r=32+Math.random()*10;
+    pos={x:50+Math.cos(angle)*r,y:50+Math.sin(angle)*r}; vel={x:0,y:0}; lastTs=null;
+    gameStatus='playing';
+    showScreen('canvas');
+    if(rafId)cancelAnimationFrame(rafId);
+    rafId=requestAnimationFrame(gameLoop);
+}
+
+function showScreen(which){
+    ['name-screen','lobby-screen','gm-screen','eliminated-screen'].forEach(id=>{
+        document.getElementById(id).classList.add('hidden');
+    });
+    canvas.classList.remove('visible');
+    document.getElementById('phase-banner').style.display='none';
+    document.getElementById('swipe-hint').style.display='none';
+    if(which==='canvas'){
+        canvas.classList.add('visible');
+        document.getElementById('phase-banner').style.display='block';
+        document.getElementById('swipe-hint').style.display='block';
+    } else {
+        document.getElementById(which).classList.remove('hidden');
+    }
+}
+
+function updatePhaseBanner(p){
+    const cfg=PHASES[p],b=document.getElementById('phase-banner');
+    b.textContent=cfg.label; b.style.color=cfg.color; b.style.borderColor=cfg.color+'50';
+}
+function updateGMPhaseUI(p){
+    const cfg=PHASES[p];
+    document.getElementById('gm-phase-info').textContent=cfg.label;
+    document.getElementById('gm-phase-info').style.color=cfg.color;
+    for(let i=1;i<=5;i++){
+        const btn=document.getElementById(`gpb${i}`);
+        if(i===p){btn.classList.add('active');btn.style.background=PHASES[i].color;btn.style.borderColor=PHASES[i].color;}
+        else{btn.classList.remove('active');btn.style.background='';btn.style.borderColor='';}
+    }
+}
+function renderGMList(){
+    const list=document.getElementById('gm-player-list');
+    list.innerHTML='';
+    const arr=Object.values(allPlayers);
+    if(!arr.length){list.innerHTML='<div style="color:#334155;font-size:0.85rem;text-align:center;padding:0.5rem;">아직 없습니다</div>';return;}
+    arr.forEach(p=>{
+        const div=document.createElement('div');
+        div.className='player-item'+(p.eliminated?' elim':'');
+        div.innerHTML=`<div class="player-dot" style="background:${p.color}"></div>
+            <span class="player-name">${p.name}</span>
+            <span class="player-status">${p.eliminated?'✝ 사로잡힘':'생존 중'}</span>`;
+        list.appendChild(div);
+    });
+    const total=arr.length,elim=arr.filter(p=>p.eliminated).length;
+    document.getElementById('gm-total').textContent=total;
+    document.getElementById('gm-alive').textContent=total-elim;
+    document.getElementById('gm-elim').textContent=elim;
+}
+
+function setupListeners(){
+    if(listenersSetup)return; listenersSetup=true;
+    onSnapshot(STATE_REF,snap=>{
+        if(!snap.exists())return;
+        const d=snap.data();
+        const ns=d.gameStatus||'lobby', np=d.phase||1;
+        if(np!==currentPhase){
+            currentPhase=np; updatePhaseBanner(currentPhase);
+            if(isGM)updateGMPhaseUI(currentPhase);
+            if(gameStatus==='playing'){canvas.style.filter='brightness(2) saturate(2)';setTimeout(()=>{canvas.style.filter='';},200);}
         }
-
-        // Firestore Strict Path Definitions
-        const STATE_COL = collection(db, 'artifacts', appId, 'public', 'data', 'gamestate');
-        const LEADERBOARD_COL = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
-        const mainStateDoc = doc(STATE_COL, 'main');
-
-        let currentUser = null;
-        let globalState = { status: 'waiting', currentRound: 1, startTime: 0 };
-        let myName = "";
-        let isAlive = false;
-        let survivedTime = 0;
-        let isGmMode = false;
-        let currentPlayId = 0; 
-
-        // ==========================================
-        // 3. 인증 및 서버 통신 (규칙 준수)
-        // ==========================================
-        const initAuth = async () => {
-            document.getElementById('loading-msg').classList.remove('hidden-safe');
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) { 
-                console.error("Auth Error", error); 
-                document.getElementById('loading-msg').innerText = "인증 실패. 플레이는 로컬에서만 진행됩니다.";
+        if(!isGM){
+            if(ns==='playing'&&gameStatus!=='playing'&&!isEliminated){beginPlay();}
+            else if(ns==='lobby'&&gameStatus==='playing'&&!isEliminated){
+                if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+                showScreen('lobby-screen');
             }
-        };
-        initAuth();
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('loading-msg').classList.add('hidden-safe');
-                setupStateListener();
-            }
+        }
+        gameStatus=ns;
+    });
+    onSnapshot(PLAYERS_COL,snap=>{
+        const uids=new Set();
+        snap.forEach(docSnap=>{
+            const uid=docSnap.id,d=docSnap.data(); uids.add(uid);
+            if(!allPlayers[uid]) allPlayers[uid]={name:d.name,eliminated:d.eliminated||false,color:COLORS[colorIdx++%COLORS.length]};
+            else allPlayers[uid].eliminated=d.eliminated||false;
         });
+        Object.keys(allPlayers).forEach(uid=>{ if(!uids.has(uid))delete allPlayers[uid]; });
+        if(isGM)renderGMList();
+        const lc=document.getElementById('lobby-count');
+        if(lc)lc.textContent=`현재 ${snap.size}명 대기 중`;
+    });
+}
 
-        function setupStateListener() {
-            if (!currentUser) return;
-            onSnapshot(mainStateDoc, (docSnap) => {
-                if (docSnap.exists()) {
-                    globalState = docSnap.data();
-                    handleStateChange();
-                } else {
-                    setDoc(mainStateDoc, { status: 'waiting', currentRound: 1, startTime: 0 }).catch(console.error);
-                }
-            }, (e) => console.error("Snapshot Error:", e));
-        }
+// ── GM 액션 ──────────────────────────────────────────
+window.setPhase=async n=>{currentPhase=n;updateGMPhaseUI(n);await updateDoc(STATE_REF,{phase:n});};
+window.startGame=async()=>{await setDoc(STATE_REF,{gameStatus:'playing',phase:currentPhase},{merge:true});};
+window.resetGame=async()=>{
+    if(!confirm('모든 플레이어를 삭제하고 초기화합니다. 계속하시겠습니까?'))return;
+    const snap=await getDocs(PLAYERS_COL);
+    const batch=writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
+    await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
+    allPlayers={}; colorIdx=0; currentPhase=1; updateGMPhaseUI(1); renderGMList();
+};
+window.exitGM=()=>{isGM=false;showScreen('name-screen');};
 
-        function handleStateChange() {
-            if(isGmMode) {
-                document.getElementById('gm-round-input').value = globalState.currentRound;
-                const statusBox = document.getElementById('gm-status-box');
-                const statusText = document.getElementById('gm-status-text');
-                if (globalState.status === 'playing') {
-                    statusBox.className = "p-4 rounded mb-6 text-center border-2 border-green-500 bg-green-900/30";
-                    statusText.className = "font-bold text-2xl text-green-400";
-                    statusText.innerText = "상태: 게임 진행 중 🏃";
-                } else {
-                    statusBox.className = "p-4 rounded mb-6 text-center border-2 border-gray-700 bg-gray-800";
-                    statusText.className = "font-bold text-2xl text-yellow-400";
-                    statusText.innerText = "상태: 대기 중 ⏳";
-                }
-            }
+// ── 비번 모달 ─────────────────────────────────────────
+document.getElementById('gm-gear-btn').addEventListener('click',()=>{
+    document.getElementById('pw-input').value='';
+    document.getElementById('pw-error').textContent='';
+    document.getElementById('pw-modal').classList.add('visible');
+    setTimeout(()=>document.getElementById('pw-input').focus(),100);
+});
+document.getElementById('pw-cancel').addEventListener('click',()=>document.getElementById('pw-modal').classList.remove('visible'));
+document.getElementById('pw-confirm').addEventListener('click',confirmPW);
+document.getElementById('pw-input').addEventListener('keypress',e=>{if(e.key==='Enter')confirmPW();});
+function confirmPW(){
+    if(document.getElementById('pw-input').value==='1004'){
+        document.getElementById('pw-modal').classList.remove('visible');
+        isGM=true; currentPhase=1; updateGMPhaseUI(1);
+        showScreen('gm-screen');
+        setupListeners(); renderGMList();
+    } else {
+        document.getElementById('pw-error').textContent='비밀번호가 틀렸습니다';
+        document.getElementById('pw-input').value='';
+        document.getElementById('pw-input').focus();
+    }
+}
 
-            if (myName !== "") {
-                document.getElementById('ui-round').innerText = globalState.currentRound;
-                
-                if (globalState.status === 'playing') {
-                    if (currentPlayId !== globalState.startTime) {
-                        currentPlayId = globalState.startTime;
-                        startLocalGame();
-                    }
-                } else {
-                    if (isAlive) endLocalGame(true);
-                    resetToWaiting();
-                }
-            }
-        }
+// ── 학생 입장 ─────────────────────────────────────────
+document.getElementById('join-btn').addEventListener('click',joinGame);
+document.getElementById('name-input').addEventListener('keypress',e=>{if(e.key==='Enter')joinGame();});
+async function joinGame(){
+    const name=document.getElementById('name-input').value.trim();
+    if(!name){document.getElementById('name-input').focus();return;}
+    myName=name;
+    document.getElementById('lobby-greeting').textContent=`${myName} 님, 준비하세요!`;
+    showScreen('lobby-screen');
+    const angle=Math.random()*Math.PI*2,r=32+Math.random()*10;
+    pos={x:50+Math.cos(angle)*r,y:50+Math.sin(angle)*r};
+    await setDoc(playerRef(myUid),{name:myName,x:pos.x,y:pos.y,eliminated:false,joinedAt:serverTimestamp()});
+    setupListeners();
+}
 
-        function resetToWaiting() {
-            document.getElementById('gameCanvas').classList.add('hidden-safe');
-            document.getElementById('ingame-ui').classList.add('hidden-safe');
-            
-            if(!document.getElementById('dead-view').classList.contains('hidden-safe')) {
-                return;
-            }
-            document.getElementById('waiting-view').classList.remove('hidden-safe');
-        }
-
-        // ==========================================
-        // 4. 게임 캔버스 로직
-        // ==========================================
-        let canvas, ctx, width, height;
-        let playerObj = { x: 0, y: 0, vx: 0, vy: 0, radius: 25, emoji: '❤️' };
-        let graceObj = { x: 0, y: 0, radius: 40, basePull: 0.1, currentPull: 0.1, sizeMultiplier: 1 };
-        let dragSensitivity = 0.2, friction = 0.90;
-        let lastTouchX = null, lastTouchY = null, isMouseDown = false;
-        let animFrameId = null;
-
-        function initCanvas() {
-            canvas = document.getElementById('gameCanvas');
-            ctx = canvas.getContext('2d');
-            function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
-            window.addEventListener('resize', resize); resize();
-
-            const handleMove = (x, y) => {
-                if(!isAlive) return;
-                if (lastTouchX !== null && lastTouchY !== null) {
-                    playerObj.vx += (x - lastTouchX) * dragSensitivity;
-                    playerObj.vy += (y - lastTouchY) * dragSensitivity;
-                }
-                lastTouchX = x; lastTouchY = y;
-            };
-
-            window.addEventListener('touchstart', e => { lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY; }, {passive: false});
-            window.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-            window.addEventListener('touchend', () => { lastTouchX = null; lastTouchY = null; });
-            
-            window.addEventListener('mousedown', e => { isMouseDown = true; lastTouchX = e.clientX; lastTouchY = e.clientY; });
-            window.addEventListener('mousemove', e => { if(isMouseDown) handleMove(e.clientX, e.clientY); });
-            window.addEventListener('mouseup', () => { isMouseDown = false; lastTouchX = null; lastTouchY = null; });
-        }
-
-        function startLocalGame() {
-            document.getElementById('waiting-view').classList.add('hidden-safe');
-            document.getElementById('dead-view').classList.add('hidden-safe');
-            document.getElementById('ingame-ui').classList.remove('hidden-safe');
-            document.getElementById('gameCanvas').classList.remove('hidden-safe');
-            
-            isAlive = true;
-            survivedTime = 0;
-            
-            playerObj.x = width * 0.1; playerObj.y = height * 0.1;
-            playerObj.vx = 0; playerObj.vy = 0;
-            graceObj.x = width / 2; graceObj.y = height / 2;
-            
-            let round = globalState.currentRound;
-            graceObj.basePull = 0.1 + (round * 0.05);
-            dragSensitivity = Math.max(0.05, 0.2 - (round * 0.02)); 
-            
-            if(animFrameId) cancelAnimationFrame(animFrameId);
-            gameLoop();
-        }
-
-        function gameLoop() {
-            if (!isAlive || globalState.status !== 'playing') return;
-
-            let elapsedTime = (Date.now() - globalState.startTime) / 1000;
-            survivedTime = elapsedTime;
-            document.getElementById('ui-time').innerText = survivedTime.toFixed(1) + "초";
-
-            let roundMultiplier = 1 + (globalState.currentRound * 0.2);
-            graceObj.currentPull = graceObj.basePull + (elapsedTime * 0.05 * roundMultiplier);
-            graceObj.sizeMultiplier = 1 + (elapsedTime * 0.1 * roundMultiplier);
-
-            let dx = playerObj.x - graceObj.x;
-            let dy = playerObj.y - graceObj.y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            
-            if (dist > 0) {
-                playerObj.vx -= (dx / dist) * graceObj.currentPull;
-                playerObj.vy -= (dy / dist) * graceObj.currentPull;
-            }
-
-            playerObj.vx *= friction; playerObj.vy *= friction;
-            playerObj.x += playerObj.vx; playerObj.y += playerObj.vy;
-
-            if (playerObj.x < playerObj.radius) { playerObj.x = playerObj.radius; playerObj.vx *= -0.5; }
-            if (playerObj.x > width - playerObj.radius) { playerObj.x = width - playerObj.radius; playerObj.vx *= -0.5; }
-            if (playerObj.y < playerObj.radius) { playerObj.y = playerObj.radius; playerObj.vy *= -0.5; }
-            if (playerObj.y > height - playerObj.radius) { playerObj.y = height - playerObj.radius; playerObj.vy *= -0.5; }
-
-            let currentGraceRadius = graceObj.radius * graceObj.sizeMultiplier;
-            if (dist < playerObj.radius + currentGraceRadius * 0.4) {
-                endLocalGame(false);
-                return;
-            }
-
-            ctx.fillStyle = '#1a202c'; ctx.fillRect(0, 0, width, height);
-
-            ctx.save();
-            ctx.translate(graceObj.x, graceObj.y);
-            let gSize = graceObj.radius * graceObj.sizeMultiplier;
-            let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, gSize * 2);
-            grad.addColorStop(0, 'rgba(253, 224, 71, 0.8)'); grad.addColorStop(0.5, 'rgba(234, 179, 8, 0.3)'); grad.addColorStop(1, 'rgba(234, 179, 8, 0)');
-            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, gSize * 2, 0, Math.PI * 2); ctx.fill();
-            ctx.font = `${gSize * 1.5}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 30; ctx.fillText('✝️', 0, 0);
-            ctx.restore();
-
-            ctx.save();
-            ctx.translate(playerObj.x, playerObj.y);
-            if(Math.abs(playerObj.vx) > 1 || Math.abs(playerObj.vy) > 1) {
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-playerObj.vx * 2, -playerObj.vy * 2);
-                ctx.strokeStyle = 'rgba(255, 99, 132, 0.5)'; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
-            }
-            ctx.font = `${playerObj.radius * 2}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(playerObj.emoji, 0, 0);
-            ctx.restore();
-
-            animFrameId = requestAnimationFrame(gameLoop);
-        }
-
-        async function endLocalGame(isForced) {
-            isAlive = false;
-            document.getElementById('gameCanvas').classList.add('hidden-safe');
-            document.getElementById('ingame-ui').classList.add('hidden-safe');
-            
-            if(!isForced && currentUser) {
-                try {
-                    await addDoc(LEADERBOARD_COL, {
-                        name: myName,
-                        time: survivedTime,
-                        round: globalState.currentRound,
-                        timestamp: Date.now()
-                    });
-                } catch(e) { console.error("기록 저장 실패", e); }
-                
-                document.getElementById('result-time').innerText = survivedTime.toFixed(1) + "초";
-                document.getElementById('dead-view').classList.remove('hidden-safe');
-                
-                setTimeout(() => {
-                    document.getElementById('dead-view').classList.add('hidden-safe');
-                    if(globalState.status === 'waiting') {
-                        document.getElementById('waiting-view').classList.remove('hidden-safe');
-                    }
-                }, 5000);
-            }
-        }
-
-        // ==========================================
-        // 5. GM 관리 로직 연동
-        // ==========================================
-        window.gmStartRound = async () => {
-            if (!currentUser) return;
-            const round = parseInt(document.getElementById('gm-round-input').value) || 1;
-            await setDoc(mainStateDoc, {
-                status: 'playing',
-                currentRound: round,
-                startTime: Date.now()
-            });
-        };
-
-        window.gmEndRound = async () => {
-            if (!currentUser) return;
-            await setDoc(mainStateDoc, {
-                status: 'waiting',
-                currentRound: globalState.currentRound,
-                startTime: 0
-            }, { merge: true });
-        };
-
-        window.gmClearLeaderboard = () => {
-            document.getElementById('gm-view').innerHTML += `
-                <div id="clear-confirm" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[100]">
-                    <p class="text-white text-2xl font-bold mb-8">모든 랭킹 기록을 삭제합니까?</p>
-                    <div class="flex gap-4">
-                        <button onclick="window.executeClear()" class="px-8 py-4 bg-red-600 rounded font-bold text-white">삭제</button>
-                        <button onclick="document.getElementById('clear-confirm').remove()" class="px-8 py-4 bg-gray-600 rounded font-bold text-white">취소</button>
-                    </div>
-                </div>
-            `;
-        };
-
-        window.executeClear = async () => {
-            const confirmBox = document.getElementById('clear-confirm');
-            if(confirmBox) confirmBox.remove();
-            
-            if (!currentUser) return;
-            try {
-                const snapshot = await getDocs(LEADERBOARD_COL);
-                const promises = [];
-                snapshot.forEach(d => promises.push(deleteDoc(doc(LEADERBOARD_COL, d.id))));
-                await Promise.all(promises);
-            } catch(e) { console.error("초기화 에러", e); }
-        };
-    </script>
+// ── 인증 ──────────────────────────────────────────────
+try{ await signInAnonymously(auth); myUid=auth.currentUser.uid; }catch(e){console.error(e);}
+</script>
 </body>
 </html>
