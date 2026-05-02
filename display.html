@@ -3,231 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TULIP: 불가항력적 은혜 - 송출 화면</title>
+    <title>불가항력적 은혜 - 송출 화면</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; overflow: hidden; color: white; margin: 0; }
-        
-        #game-canvas { display: block; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
-        
-        #ui-layer { position: relative; z-index: 20; height: 100vh; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 2rem; }
-
-        /* 상태 메세지 효과 */
-        .phase-text { transition: all 0.5s ease; text-shadow: 0 4px 20px rgba(0,0,0,0.8); }
-
-        /* 4단계 폭발 효과 */
-        .golden-overlay { position: absolute; inset: 0; background: radial-gradient(circle, #eab308 0%, transparent 70%); opacity: 0; transition: opacity 2s ease-in-out; z-index: 5; mix-blend-mode: screen; }
-        .golden-overlay.active { opacity: 0.8; }
+        body { margin: 0; background-color: #0f172a; overflow: hidden; font-family: 'Malgun Gothic', sans-serif; }
+        @keyframes glow {
+            0% { text-shadow: 0 0 10px #fbbf24, 0 0 20px #fbbf24; }
+            50% { text-shadow: 0 0 20px #fcd34d, 0 0 40px #fbbf24; }
+            100% { text-shadow: 0 0 10px #fbbf24, 0 0 20px #fbbf24; }
+        }
+        .text-glow { animation: glow 2s infinite; }
     </style>
 </head>
-<body class="w-full h-screen relative">
+<body class="text-white h-screen flex flex-col p-8">
 
-    <div id="golden-overlay" class="golden-overlay"></div>
+    <div class="text-center mb-8">
+        <h1 class="text-7xl font-black text-yellow-400 text-glow mb-4 tracking-wider">불가항력적 은혜</h1>
+        <h2 id="screen-round-title" class="text-4xl font-bold text-gray-300">데이터 연결 중...</h2>
+    </div>
 
-    <canvas id="game-canvas"></canvas>
+    <div id="status-banner" class="text-center bg-gray-800 p-8 rounded-3xl mb-8 border-2 border-gray-600 shadow-2xl transition-colors duration-500">
+        <p class="text-5xl font-black text-blue-400">학생들은 메인 화면에서 이름을 입력하고 입장해주세요!</p>
+    </div>
 
-    <div id="ui-layer">
-        <header class="flex justify-between items-start">
-            <div>
-                <h1 class="text-6xl font-black text-yellow-500 mb-2 tracking-tighter drop-shadow-lg">TU<span class="text-yellow-400">L</span>IP</h1>
-                <h2 class="text-3xl font-bold text-slate-200 drop-shadow-md">불가항력적 은혜 <span class="text-xl text-slate-400 font-normal ml-2">은혜의 블랙홀</span></h2>
-            </div>
-            <div class="bg-slate-900 bg-opacity-80 px-6 py-4 rounded-3xl border border-slate-700 backdrop-blur-sm text-right">
-                <p class="text-xl font-bold text-slate-400">접속 중인 심령</p>
-                <p class="text-5xl font-black text-white"><span id="total-players">0</span><span class="text-2xl text-slate-500">명</span></p>
-            </div>
-        </header>
-
-        <!-- 하단 상태 메시지 -->
-        <div class="text-center pb-8">
-            <h3 id="phase-title" class="text-5xl font-black text-white mb-4 phase-text">게임 준비 중</h3>
-            <p id="phase-desc" class="text-2xl font-bold text-slate-300 phase-text">스마트폰을 연결하고 대기해 주세요.</p>
+    <div class="flex-1 bg-gray-800/80 rounded-3xl border border-gray-600 p-10 shadow-2xl flex flex-col overflow-hidden">
+        <div class="flex justify-between items-end border-b-2 border-gray-600 pb-6 mb-6">
+            <h3 class="text-4xl font-black text-white flex items-center gap-3">
+                <span>🏆</span> 현재 라운드 생존 순위
+            </h3>
+            <span class="text-yellow-400 text-2xl font-bold">버틴 시간 (초)</span>
         </div>
         
-        <!-- 4단계 항복 메시지 (정중앙 팝업) -->
-        <div id="surrender-msg" class="absolute inset-0 flex flex-col items-center justify-center opacity-0 transition-opacity duration-1000 z-50">
-            <h1 class="text-[8rem] font-black text-white drop-shadow-[0_0_50px_rgba(250,204,21,1)] tracking-widest">완전한 속죄</h1>
-            <p class="text-4xl font-bold text-yellow-300 mt-6 bg-black bg-opacity-50 px-8 py-3 rounded-full border border-yellow-500">우리의 고집을 꺾으시는 하나님의 사랑</p>
+        <!-- 랭킹 리스트가 표시될 영역 -->
+        <div id="leaderboard-container" class="flex-1 overflow-y-auto flex flex-col gap-4 pr-4 custom-scrollbar">
+            <div class="text-center text-gray-500 text-2xl mt-10">아직 잡힌 사람이 없습니다.</div>
         </div>
     </div>
 
+    <!-- Firebase SDK -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        const myFirebaseConfig = {
-            apiKey: "AIzaSyCfyjgtiDVD4Wsd9iGb9tEdrOGFYxxN2Tw",
-            authDomain: "kingdomgenius.firebaseapp.com",
-            projectId: "kingdomgenius",
-            storageBucket: "kingdomgenius.firebasestorage.app",
-            messagingSenderId: "385557748196",
-            appId: "1:385557748196:web:457b999a38e4982f188ff1"
-        };
+        // 메인 앱과 동일한 앱 ID 사용
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'grace-game-v2';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey":"dummy"}');
         
-        let app, auth, db, stateDocRef, playersColRef;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            app = initializeApp(JSON.parse(__firebase_config)); db = getFirestore(app);
-            stateDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'tulip_i_state', 'main');
-            playersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'tulip_i_players');
-        } else {
-            app = initializeApp(myFirebaseConfig); db = getFirestore(app);
-            stateDocRef = doc(db, 'kingdom_genius_games', 'tulip_i_room', 'data', 'state');
-            playersColRef = collection(db, 'kingdom_genius_games', 'tulip_i_room', 'players');
+        const STATE_PATH = `artifacts/${appId}/public/data/gamestate`;
+        const LEADERBOARD_PATH = `artifacts/${appId}/public/data/leaderboard`;
+
+        let currentRound = 1;
+        let isPlaying = false;
+        let leaderboardData = [];
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) { console.error("Auth Error", error); }
         }
-        auth = getAuth(app);
 
-        let currentPhase = 'lobby';
-        let displayPlayers = {}; // 화면 렌더링용 보간(Lerp) 데이터 객체
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupListeners();
+            }
+        });
+        initAuth();
 
-        // --- 캔버스 렌더링 설정 ---
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.addEventListener('resize', resize); resize();
-
-        const initAuth = async () => {
-            try { await signInAnonymously(auth); setupRealtimeListeners(); } 
-            catch (error) { console.error("Auth error:", error); }
-        };
-        window.addEventListener('DOMContentLoaded', initAuth);
-
-        function setupRealtimeListeners() {
-            onSnapshot(stateDocRef, (docSnap) => {
+        function setupListeners() {
+            // 1. 게임 상태 (라운드, 진행여부) 수신
+            onSnapshot(doc(db, STATE_PATH, 'main'), (docSnap) => {
                 if (docSnap.exists()) {
-                    currentPhase = docSnap.data().phase || 'lobby';
-                    updateDisplayPhase();
+                    const data = docSnap.data();
+                    currentRound = data.currentRound;
+                    isPlaying = data.status === 'playing';
+                    updateScreenUI();
+                    renderLeaderboard(); // 라운드가 바뀌면 랭킹도 다시 필터링
                 }
             });
 
-            onSnapshot(playersColRef, (querySnapshot) => {
-                const currentUids = [];
-                querySnapshot.forEach((doc) => { 
-                    const uid = doc.id;
-                    const data = doc.data();
-                    currentUids.push(uid);
-
-                    if (!displayPlayers[uid]) {
-                        // 새 플레이어 진입 시 초기값 
-                        displayPlayers[uid] = { name: data.name, x: data.x || 50, y: data.y || 80, tx: data.x || 50, ty: data.y || 80 };
-                    } else {
-                        // 기존 플레이어 목표 좌표 업데이트
-                        displayPlayers[uid].tx = data.x;
-                        displayPlayers[uid].ty = data.y;
-                    }
-                });
-
-                // 나간 플레이어 삭제
-                Object.keys(displayPlayers).forEach(uid => {
-                    if (!currentUids.includes(uid)) delete displayPlayers[uid];
-                });
-
-                document.getElementById('total-players').innerText = currentUids.length;
+            // 2. 리더보드 데이터 수신 (모두 가져와서 JS에서 필터링)
+            onSnapshot(collection(db, LEADERBOARD_PATH), (snapshot) => {
+                leaderboardData = [];
+                snapshot.forEach(doc => leaderboardData.push({ id: doc.id, ...doc.data() }));
+                // 내림차순 정렬 (오래 버틴 사람이 위로)
+                leaderboardData.sort((a, b) => b.time - a.time);
+                renderLeaderboard();
             });
         }
 
-        // 상태 패널 UI 텍스트 변경
-        function updateDisplayPhase() {
-            const title = document.getElementById('phase-title');
-            const desc = document.getElementById('phase-desc');
-            const overlay = document.getElementById('golden-overlay');
-            const surrenderMsg = document.getElementById('surrender-msg');
-
-            overlay.classList.remove('active');
-            surrenderMsg.classList.remove('opacity-100');
-            surrenderMsg.classList.add('opacity-0');
-
-            switch(currentPhase) {
-                case 'lobby':
-                    title.innerText = "대기 중"; title.className = "text-5xl font-black text-white mb-4 phase-text";
-                    desc.innerText = "스마트폰을 연결하고 기다려주세요.";
-                    break;
-                case 's1':
-                    title.innerText = "자유 의지의 발동"; title.className = "text-5xl font-black text-slate-300 mb-4 phase-text";
-                    desc.innerText = "십자가를 피해 도망치는 영혼들";
-                    break;
-                case 's2':
-                    title.innerText = "희미한 부르심"; title.className = "text-5xl font-black text-blue-400 mb-4 phase-text";
-                    desc.innerText = "은혜의 중력이 발생하기 시작합니다.";
-                    break;
-                case 's3':
-                    title.innerText = "강력한 이끌림"; title.className = "text-5xl font-black text-purple-400 mb-4 phase-text drop-shadow-[0_0_15px_rgba(192,132,252,0.8)]";
-                    desc.innerText = "필사적으로 버티고 저항하지만, 십자가로 끌려갑니다.";
-                    break;
-                case 's4':
-                    title.innerText = ""; desc.innerText = "";
-                    overlay.classList.add('active'); // 황금빛 폭발 배경
-                    
-                    // 약간의 딜레이 후 완전한 속죄 글자 등장
-                    setTimeout(() => {
-                        if(currentPhase === 's4') {
-                            surrenderMsg.classList.remove('opacity-0');
-                            surrenderMsg.classList.add('opacity-100');
-                        }
-                    }, 2000);
-                    break;
+        function updateScreenUI() {
+            document.getElementById('screen-round-title').innerText = `현재 라운드 : ${currentRound} R`;
+            const banner = document.getElementById('status-banner');
+            
+            if (isPlaying) {
+                banner.className = "text-center bg-red-900/40 p-8 rounded-3xl mb-8 border-4 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)] transition-colors duration-500";
+                banner.innerHTML = `<p class="text-6xl font-black text-red-400 animate-pulse">🔥 은혜가 추적 중입니다! 도망치세요! 🔥</p>`;
+            } else {
+                banner.className = "text-center bg-gray-800 p-8 rounded-3xl mb-8 border-2 border-gray-600 shadow-2xl transition-colors duration-500";
+                banner.innerHTML = `<p class="text-5xl font-black text-blue-400">대기 중입니다. 학생들은 화면을 보고 대기해주세요.</p>`;
             }
         }
 
-        // --- 메인 렌더링 루프 (모든 참가자의 하트 애니메이션) ---
-        function renderLoop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 중앙 십자가 렌더링
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
+        function renderLeaderboard() {
+            const container = document.getElementById('leaderboard-container');
+            container.innerHTML = '';
             
-            ctx.save();
-            ctx.translate(cx, cy);
+            // 현재 라운드 데이터만 표시
+            const currentRoundData = leaderboardData.filter(d => d.round === currentRound);
             
-            // 페이즈별 십자가 이펙트
-            if(currentPhase === 's2') { ctx.shadowBlur = 30; ctx.shadowColor = '#60a5fa'; ctx.fillStyle = '#bfdbfe'; }
-            else if(currentPhase === 's3') { ctx.shadowBlur = 60; ctx.shadowColor = '#c084fc'; ctx.fillStyle = '#e9d5ff'; }
-            else if(currentPhase === 's4') { ctx.shadowBlur = 150; ctx.shadowColor = '#facc15'; ctx.fillStyle = '#fef08a'; }
-            else { ctx.shadowBlur = 0; ctx.fillStyle = '#475569'; }
+            if (currentRoundData.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 text-3xl mt-20 font-bold">아직 은혜에 붙잡힌 사람이 없습니다!</div>';
+                return;
+            }
 
-            // 십자가 모양 (크기 확대)
-            ctx.fillRect(-20, -60, 40, 160); 
-            ctx.fillRect(-60, -20, 120, 40); 
-            ctx.restore();
+            // 최대 상위 50명만 렌더링
+            currentRoundData.slice(0, 50).forEach((entry, index) => {
+                let rankStyle = "text-gray-400 text-3xl";
+                let medal = "";
+                let bgStyle = "bg-gray-700/50";
+                let borderStyle = "border-gray-600";
 
-            // 모든 플레이어 렌더링
-            ctx.font = '24px "Font Awesome 6 Free"';
-            ctx.fontWeight = '900';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+                if (index === 0) { rankStyle = "text-yellow-400 text-5xl"; medal = "👑"; bgStyle = "bg-yellow-900/30"; borderStyle = "border-yellow-500"; }
+                else if (index === 1) { rankStyle = "text-gray-300 text-4xl"; medal = "🥈"; bgStyle = "bg-gray-700"; }
+                else if (index === 2) { rankStyle = "text-orange-400 text-4xl"; medal = "🥉"; bgStyle = "bg-orange-900/20"; borderStyle = "border-orange-600"; }
 
-            Object.values(displayPlayers).forEach(p => {
-                // 부드러운 움직임을 위한 보간(Lerp) 로직
-                // 스마트폰에서 0.3초마다 쏘는 목표 좌표(tx, ty)를 향해 부드럽게 이동합니다.
-                p.x += (p.tx - p.x) * 0.1;
-                p.y += (p.ty - p.y) * 0.1;
-
-                const px = (p.x / 100) * canvas.width;
-                const py = (p.y / 100) * canvas.height;
-
-                // 하트 그리기
-                ctx.fillStyle = currentPhase === 's4' ? '#fef08a' : '#ef4444'; // 4단계에선 황금색 하트
-                ctx.shadowBlur = currentPhase === 's4' ? 10 : 5;
-                ctx.shadowColor = currentPhase === 's4' ? '#facc15' : '#b91c1c';
-                ctx.fillText('\uf004', px, py);
-
-                // 이름 텍스트 그리기
-                ctx.font = '12px "Noto Sans KR"';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-                ctx.shadowBlur = 0;
-                ctx.fillText(p.name, px, py + 25);
-                ctx.font = '24px "Font Awesome 6 Free"'; // 폰트 원복
+                let item = `
+                    <div class="flex justify-between items-center ${bgStyle} p-5 rounded-2xl border ${borderStyle} transform transition-all duration-300 hover:scale-[1.01]">
+                        <div class="flex items-center gap-8">
+                            <span class="font-black w-16 text-center ${rankStyle}">${index + 1}</span>
+                            <span class="text-4xl font-bold text-white">${medal} ${entry.name}</span>
+                        </div>
+                        <span class="text-yellow-400 font-black text-5xl tracking-widest">${entry.time.toFixed(1)}<span class="text-3xl">초</span></span>
+                    </div>
+                `;
+                container.innerHTML += item;
             });
-
-            requestAnimationFrame(renderLoop);
         }
-        
-        requestAnimationFrame(renderLoop);
     </script>
 </body>
 </html>
