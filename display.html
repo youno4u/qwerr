@@ -150,7 +150,7 @@
     <!-- 명단 사이드바 -->
     <div id="sidebar">
         <div class="sidebar-header">
-            <div class="sidebar-title">✝현황</div>
+            <div class="sidebar-title">✝ 심령 현황</div>
             <div class="mini-stats">
                 <div class="mini-stat"><div class="mini-stat-num" id="s-total" style="color:#60a5fa;">0</div><div class="mini-stat-lbl">접속</div></div>
                 <div class="mini-stat"><div class="mini-stat-num" id="s-alive" style="color:#4ade80;">0</div><div class="mini-stat-lbl">생존</div></div>
@@ -159,7 +159,7 @@
         </div>
 
         <div class="list-section" id="player-list">
-            <div class="list-label">접속 중인 사람</div>
+            <div class="list-label">접속 중인 심령</div>
             <div id="alive-items"></div>
             <div class="elim-divider" id="elim-divider" style="display:none;">
                 <div class="elim-divider-line"></div>
@@ -335,6 +335,9 @@ function setupListeners(){
         // 5단계 황금 플래시
         const flash=document.getElementById('golden-flash');
         if(np===5)flash.classList.add('active'); else flash.classList.remove('active');
+
+        // 완전 리셋 — 명단 초기화
+        if(ns==='reset'){ displayPlayers={}; colorIdx=0; renderList(); }
 
         // 로비 오버레이
         const overlay=document.getElementById('lobby-overlay');
