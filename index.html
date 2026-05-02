@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TULIP: 불가항력적 은혜</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; overflow: hidden; touch-action: none; color: white; }
+        .screen { display: none; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+        .active { display: flex; }
+        
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; touch-action: none; }
+        .ui-layer { position: relative; z-index: 30; pointer-events: none; }
+        .interactive-ui { pointer-events: auto; }
+        
+        /* 4단계 불가항력적 은혜 연출 (황금빛) */
+        .grace-glow { background: radial-gradient(circle, #eab308 0%, #0f172a 80%); }
+        #p-grace-overlay { opacity: 0; transition: opacity 1.5s ease-in-out; }
+        #p-grace-overlay.show-grace { opacity: 1; }
+
+        /* 화면 흔들림 */
+        @keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-3px, 3px); } 50% { transform: translate(3px, -3px); } 75% { transform: translate(-3px, -3px); } }
+        .shaking { animation: shake 0.1s infinite; }
+
+        /* GM 모달 */
+        #gm-login-modal { display: none; background: rgba(0,0,0,0.8); }
+        #gm-login-modal.active { display: flex; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 로그인 화면 -->
+    <div id="screen-login" class="screen active flex-col items-center justify-center p-6 text-center relative">
+        <h1 class="text-5xl font-black text-yellow-500 mb-2 drop-shadow-md tracking-tighter">TU<span class="text-yellow-400">L</span>IP</h1>
+        <h2 class="text-3xl font-bold text-slate-300 mb-8">불가항력적 은혜</h2>
+        
+        <div class="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl z-10">
+            <input type="text" id="player-name" placeholder="이름을 입력하세요" class="w-full text-center text-2xl p-4 rounded-xl mb-6 bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-yellow-500 transition-colors" maxlength="8">
+            <button id="btn-join" class="w-full bg-yellow-600 hover:bg-yellow-500 text-slate-900 font-black py-4 rounded-xl text-xl transition-colors shadow-lg active:scale-95">입장하기</button>
+        </div>
+        
+        <!-- GM 설정 버튼 -->
+        <button onclick="document.getElementById('gm-login-modal').classList.add('active')" class="absolute bottom-6 right-6 text-slate-600 hover:text-slate-400 text-2xl p-2 z-10 interactive-ui">
+            <i class="fas fa-cog"></i>
+        </button>
+    </div>
+
+    <!-- GM 로그인 모달 -->
+    <div id="gm-login-modal" class="absolute inset-0 z-50 flex-col items-center justify-center p-6">
+        <div class="bg-slate-800 p-8 rounded-2xl w-full max-w-sm border border-slate-600 shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4 text-center">GM 로그인</h3>
+            <input type="password" id="gm-password" placeholder="비밀번호 입력" class="w-full text-center text-xl p-3 rounded-lg mb-4 bg-slate-900 border border-slate-600 text-white focus:outline-none focus:border-yellow-500">
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('gm-login-modal').classList.remove('active')" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 rounded-lg">취소</button>
+                <button onclick="tryGmServerLogin()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-slate-900 font-bold py-3 rounded-lg">접속</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 플레이어 화면 -->
+    <div id="screen-player" class="screen flex-col relative overflow-hidden bg-slate-900">
+        
+        <canvas id="game-canvas"></canvas>
+
+        <div class="ui-layer w-full h-full p-6 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <div class="bg-slate-800 bg-opacity-80 px-4 py-2 rounded-full border border-slate-700">
+                    <span id="p-name-disp" class="font-bold text-slate-300">이름</span>
+                </div>
+            </div>
+
+            <!-- 중앙 지시문 -->
+            <div id="p-instruction" class="text-center transition-all duration-500 mt-10">
+                <h3 id="p-inst-title" class="text-3xl font-black text-white mb-2 drop-shadow-lg">대기 중</h3>
+                <p id="p-inst-desc" class="text-sm text-slate-300 bg-slate-900 bg-opacity-60 inline-block px-4 py-2 rounded-xl">곧 게임이 시작됩니다.</p>
+            </div>
+
+            <div class="h-24"></div> 
+        </div>
+
+        <!-- 4단계 불가항력적 은혜 오버레이 -->
+        <div id="p-grace-overlay" class="absolute inset-0 bg-yellow-600 bg-opacity-40 z-40 hidden flex-col items-center justify-center backdrop-blur-sm pointer-events-none">
+            <div class="text-7xl text-yellow-300 mb-6 drop-shadow-[0_0_30px_rgba(253,224,71,1)]"><i class="fas fa-cross"></i></div>
+            <h2 class="text-5xl font-black text-white drop-shadow-lg text-center leading-tight">완전한 속죄<br><span class="text-yellow-300">항복!</span></h2>
+            <p class="text-slate-100 font-bold mt-4 bg-black bg-opacity-50 px-4 py-2 rounded-full">자유의지는 은혜를 이길 수 없습니다.</p>
+        </div>
+    </div>
+
+    <!-- 3. GM 통제 화면 -->
+    <div id="screen-gm" class="screen flex-col p-6 bg-slate-900 overflow-y-auto">
+        <header class="mb-6 border-b border-slate-700 pb-4">
+            <h2 class="text-3xl font-black text-yellow-500 flex items-center"><i class="fas fa-gamepad mr-3"></i>GM 컨트롤 패널</h2>
+            <div class="flex justify-between items-center mt-2">
+                <span class="text-slate-400">접속자: <span id="gm-player-count" class="font-bold text-white">0</span>명</span>
+                <button onclick="resetGame()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"><i class="fas fa-trash-alt mr-2"></i>전체 초기화</button>
+            </div>
+        </header>
+
+        <div class="grid gap-4 mb-6">
+            <button onclick="setPhase('lobby')" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-xl border-2 border-slate-600 flex justify-between px-6 items-center">
+                <span><i class="fas fa-home mr-2 text-slate-400"></i>대기실 (Lobby)</span>
+            </button>
+            <button onclick="setPhase('s1')" class="bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold py-4 rounded-xl border-2 border-slate-500 flex justify-between px-6 items-center">
+                <span><i class="fas fa-running mr-2 text-slate-300"></i>1단계: 내 마음대로 (인력 없음)</span>
+            </button>
+            <button onclick="setPhase('s2')" class="bg-blue-900 hover:bg-blue-800 text-blue-100 font-bold py-4 rounded-xl border-2 border-blue-700 flex justify-between px-6 items-center">
+                <span><i class="fas fa-magnet mr-2 text-blue-400"></i>2단계: 희미한 부르심 (약한 인력)</span>
+            </button>
+            <button onclick="setPhase('s3')" class="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold py-4 rounded-xl border-2 border-purple-700 flex justify-between px-6 items-center">
+                <span><i class="fas fa-exclamation-triangle mr-2 text-purple-400"></i>3단계: 강력한 이끌림 (강한 인력)</span>
+            </button>
+            <button onclick="setPhase('s4')" class="bg-yellow-600 hover:bg-yellow-500 text-slate-900 font-black py-5 rounded-xl border-2 border-yellow-400 flex justify-between px-6 items-center transform scale-105 shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+                <span class="text-xl"><i class="fas fa-cross mr-2 text-slate-900"></i>4단계: 불가항력적 은혜 (항복)</span>
+            </button>
+        </div>
+        
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <h3 class="text-slate-400 font-bold mb-2">현재 단계: <span id="gm-current-phase" class="text-white">lobby</span></h3>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyCfyjgtiDVD4Wsd9iGb9tEdrOGFYxxN2Tw",
+            authDomain: "kingdomgenius.firebaseapp.com",
+            projectId: "kingdomgenius",
+            storageBucket: "kingdomgenius.firebasestorage.app",
+            messagingSenderId: "385557748196",
+            appId: "1:385557748196:web:457b999a38e4982f188ff1"
+        };
+        
+        let app, auth, db, stateDocRef, playersColRef;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            app = initializeApp(JSON.parse(__firebase_config)); db = getFirestore(app);
+            stateDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'tulip_i_state', 'main');
+            playersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'tulip_i_players');
+        } else {
+            app = initializeApp(myFirebaseConfig); db = getFirestore(app);
+            stateDocRef = doc(db, 'kingdom_genius_games', 'tulip_i_room', 'data', 'state');
+            playersColRef = collection(db, 'kingdom_genius_games', 'tulip_i_room', 'players');
+        }
+        auth = getAuth(app);
+
+        // 전역 상태
+        window.myRole = null; window.myUid = null; window.myName = "";
+        window.gameState = { phase: 'lobby' };
+        window.playersData = {};
+
+        // 캔버스 및 물리 엔진 변수
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas);
+
+        let gameLoopId = null;
+        let isPlaying = false;
+        let lastDbSync = 0;
+        let graceTriggered = false;
+        
+        // 플레이어 물리 데이터 (x, y는 % 좌표)
+        let player = { x: 50, y: 80, size: 15 };
+        let touchTarget = null; // 사용자가 터치/드래그 하는 목표 지점
+
+        // 페이즈별 중력(인력) 세팅 (gravity: 십자가로 당기는 힘, speed: 유저가 도망치는 최대 속도)
+        const phasePhysics = {
+            'lobby': { gravity: 0, speed: 1.5 },
+            's1': { gravity: 0, speed: 1.5 }, // 1단계: 십자가 인력 없음
+            's2': { gravity: 0.2, speed: 1.5 }, // 2단계: 약한 인력 (도망 가능)
+            's3': { gravity: 0.8, speed: 1.5 }, // 3단계: 강한 인력 (열심히 문지르면 도망 가능)
+            's4': { gravity: 6.0, speed: 0.5 }  // 4단계: 초강력 인력 (유저 속도도 느려짐, 절대 못 도망감)
+        };
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else await signInAnonymously(auth);
+            } catch (error) { console.error(error); }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) { window.myUid = user.uid; setupRealtimeListeners(); }
+        });
+
+        function setupRealtimeListeners() {
+            onSnapshot(stateDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    window.gameState = docSnap.data();
+                    updateUIBasedOnRole();
+                }
+            });
+
+            onSnapshot(playersColRef, (querySnapshot) => {
+                window.playersData = {};
+                querySnapshot.forEach((doc) => { window.playersData[doc.id] = doc.data(); });
+                updateUIBasedOnRole();
+                
+                // 강제 퇴장
+                if (window.myRole === 'player' && isPlaying && !window.playersData[window.myUid]) {
+                    window.myRole = null; isPlaying = false; graceTriggered = false;
+                    if(gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
+                    switchScreen('screen-login');
+                }
+            });
+        }
+
+        window.switchScreen = (id) => { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); };
+
+        window.tryGmServerLogin = () => {
+            if(document.getElementById('gm-password').value === '1004') {
+                window.myRole = 'gm';
+                document.getElementById('gm-login-modal').classList.remove('active');
+                document.getElementById('gm-password').value = '';
+                switchScreen('screen-gm');
+            } else document.getElementById('gm-password').value = '';
+        }
+
+        function updateUIBasedOnRole() {
+            const phase = window.gameState.phase || 'lobby';
+
+            if (window.myRole === 'player') {
+                const instTitle = document.getElementById('p-inst-title');
+                const instDesc = document.getElementById('p-inst-desc');
+                const gameArea = document.getElementById('screen-player');
+                const graceOverlay = document.getElementById('p-grace-overlay');
+
+                if(phase !== 's4') {
+                    graceOverlay.classList.add('hidden');
+                    graceOverlay.classList.remove('flex', 'show-grace');
+                    gameArea.classList.remove('grace-glow', 'shaking');
+                    graceTriggered = false;
+                }
+
+                if (phase === 'lobby') {
+                    instTitle.innerText = "대기 중"; instDesc.innerText = "화면 중앙의 십자가를 주목하세요.";
+                } 
+                else if (phase === 's1') {
+                    instTitle.innerText = "자유 의지 발동!"; instTitle.className = "text-3xl font-black text-white mb-2";
+                    instDesc.innerText = "화면을 문질러 십자가에서 도망치세요.";
+                }
+                else if (phase === 's2') {
+                    instTitle.innerText = "희미한 부르심"; instTitle.className = "text-3xl font-black text-blue-300 mb-2";
+                    instDesc.innerText = "십자가가 당신을 부르기 시작합니다.";
+                }
+                else if (phase === 's3') {
+                    instTitle.innerText = "강력한 이끌림!"; instTitle.className = "text-3xl font-black text-purple-400 mb-2 drop-shadow-md";
+                    instDesc.innerText = "고집을 피워 끝까지 도망쳐 보세요!";
+                }
+                else if (phase === 's4') {
+                    instTitle.innerText = ""; instDesc.innerText = "";
+                    gameArea.classList.add('shaking'); // 항복 전 흔들림
+                }
+            }
+            
+            if (window.myRole === 'gm') {
+                document.getElementById('gm-player-count').innerText = Object.keys(window.playersData).length;
+                document.getElementById('gm-current-phase').innerText = phase;
+            }
+        }
+
+        // 터치/마우스 이벤트 (하트를 움직이기 위한 목표 좌표 설정)
+        const canvasEl = document.getElementById('game-canvas');
+        
+        function updateTouchTarget(clientX, clientY) {
+            touchTarget = {
+                x: (clientX / window.innerWidth) * 100,
+                y: (clientY / window.innerHeight) * 100
+            };
+        }
+
+        canvasEl.addEventListener('touchstart', (e) => { updateTouchTarget(e.touches[0].clientX, e.touches[0].clientY); });
+        canvasEl.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); updateTouchTarget(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+        canvasEl.addEventListener('touchend', () => { touchTarget = null; });
+        
+        // PC 테스트용
+        let isMouseDown = false;
+        canvasEl.addEventListener('mousedown', (e) => { isMouseDown = true; updateTouchTarget(e.clientX, e.clientY); });
+        canvasEl.addEventListener('mousemove', (e) => { if(isMouseDown) updateTouchTarget(e.clientX, e.clientY); });
+        canvasEl.addEventListener('mouseup', () => { isMouseDown = false; touchTarget = null; });
+        canvasEl.addEventListener('mouseleave', () => { isMouseDown = false; touchTarget = null; });
+
+
+        document.getElementById('btn-join').addEventListener('click', async () => {
+            const nameInput = document.getElementById('player-name').value.trim();
+            if (!nameInput) return;
+
+            window.myName = nameInput; window.myRole = 'player';
+            isPlaying = true; graceTriggered = false;
+            player = { x: 50, y: 80, size: window.innerWidth * 0.05 }; // 시작 위치 (아래쪽)
+            touchTarget = null;
+            
+            await setDoc(doc(playersColRef, window.myUid), { name: window.myName, x: player.x, y: player.y });
+
+            resizeCanvas();
+            switchScreen('screen-player');
+            document.getElementById('p-name-disp').innerText = window.myName;
+            
+            startGameLoop();
+        });
+
+        // --- 메인 물리 엔진 ---
+        function startGameLoop() {
+            if(gameLoopId) cancelAnimationFrame(gameLoopId);
+            
+            function loop() {
+                if(!isPlaying) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const phase = window.gameState.phase;
+                const physics = phasePhysics[phase] || phasePhysics['lobby'];
+                
+                // 1. 유저 이동 (내 자유의지로 도망침)
+                if (touchTarget && phase !== 'lobby') {
+                    let tx = touchTarget.x - player.x;
+                    let ty = touchTarget.y - player.y;
+                    let dist = Math.sqrt(tx*tx + ty*ty);
+                    
+                    if (dist > 0) {
+                        let move = Math.min(physics.speed, dist);
+                        player.x += (tx/dist) * move;
+                        player.y += (ty/dist) * move;
+                    }
+                }
+
+                // 2. 십자가 중력 (은혜의 인력)
+                // 중앙 좌표 (50%, 50%)
+                const cx = 50; const cy = 50;
+                let dx = cx - player.x;
+                let dy = cy - player.y;
+                let cDist = Math.sqrt(dx*dx + dy*dy);
+
+                if (cDist > 0 && phase !== 's1' && phase !== 'lobby') {
+                    let pull = Math.min(physics.gravity, cDist);
+                    player.x += (dx/cDist) * pull;
+                    player.y += (dy/cDist) * pull;
+
+                    // 4단계: 십자가에 완전히 흡수되었을 때 연출
+                    if (phase === 's4' && cDist < 2 && !graceTriggered) {
+                        graceTriggered = true;
+                        document.getElementById('screen-player').classList.remove('shaking');
+                        document.getElementById('screen-player').classList.add('grace-glow');
+                        
+                        const graceOverlay = document.getElementById('p-grace-overlay');
+                        graceOverlay.classList.remove('hidden');
+                        graceOverlay.classList.add('flex');
+                        setTimeout(() => { graceOverlay.classList.add('show-grace'); }, 100);
+                    }
+                }
+
+                // 화면 밖으로 못 나가게 가두기
+                player.x = Math.max(5, Math.min(95, player.x));
+                player.y = Math.max(5, Math.min(95, player.y));
+
+                // --- 렌더링 ---
+                // 중앙 십자가 그리기
+                const centerPx = (50 / 100) * canvas.width;
+                const centerPy = (50 / 100) * canvas.height;
+                
+                ctx.save();
+                ctx.translate(centerPx, centerPy);
+                
+                // 페이즈별 십자가 빛 (S4에서 폭발)
+                if(phase === 's2') { ctx.shadowBlur = 20; ctx.shadowColor = '#60a5fa'; }
+                else if(phase === 's3') { ctx.shadowBlur = 40; ctx.shadowColor = '#c084fc'; }
+                else if(phase === 's4') { ctx.shadowBlur = 100; ctx.shadowColor = '#facc15'; }
+                else { ctx.shadowBlur = 10; ctx.shadowColor = '#475569'; }
+
+                ctx.fillStyle = phase === 's4' ? '#fef08a' : '#cbd5e1';
+                ctx.fillRect(-10, -30, 20, 80); // 세로 기둥
+                ctx.fillRect(-30, -10, 60, 20); // 가로 기둥
+                ctx.restore();
+
+                // 내 하트(플레이어) 그리기
+                const px = (player.x / 100) * canvas.width;
+                const py = (player.y / 100) * canvas.height;
+                
+                ctx.font = '30px "Font Awesome 6 Free"';
+                ctx.fontWeight = '900';
+                ctx.fillStyle = phase === 's4' && cDist < 5 ? '#facc15' : '#ef4444'; // 흡수되면 황금색으로
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('\uf004', px, py); // FontAwesome 하트 유니코드
+
+                // DB 동기화 (0.3초마다 내 좌표를 서버로 쏨 -> 송출 화면에서 모두 보게 함)
+                const now = Date.now();
+                if (now - lastDbSync > 300) {
+                    // 서버에는 소수점 버리고 전송
+                    setDoc(doc(playersColRef, window.myUid), { x: Math.floor(player.x), y: Math.floor(player.y) }, { merge: true });
+                    lastDbSync = now;
+                }
+
+                gameLoopId = requestAnimationFrame(loop);
+            }
+            gameLoopId = requestAnimationFrame(loop);
+        }
+
+        // --- GM 기능 ---
+        window.setPhase = async (newPhase) => { await setDoc(stateDocRef, { phase: newPhase }, { merge: true }); };
+        
+        window.resetGame = async () => { 
+            await setDoc(stateDocRef, { phase: 'lobby' });
+            const pKeys = Object.keys(window.playersData || {});
+            const deletePromises = pKeys.map(uid => deleteDoc(doc(playersColRef, uid)));
+            await Promise.all(deletePromises);
+        };
+
+        window.addEventListener('DOMContentLoaded', initAuth);
+    </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TULIP: 불가항력적 은혜 - 송출 화면</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; overflow: hidden; color: white; margin: 0; }
+        
+        #game-canvas { display: block; position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
+        
+        #ui-layer { position: relative; z-index: 20; height: 100vh; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 2rem; }
+
+        /* 상태 메세지 효과 */
+        .phase-text { transition: all 0.5s ease; text-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+
+        /* 4단계 폭발 효과 */
+        .golden-overlay { position: absolute; inset: 0; background: radial-gradient(circle, #eab308 0%, transparent 70%); opacity: 0; transition: opacity 2s ease-in-out; z-index: 5; mix-blend-mode: screen; }
+        .golden-overlay.active { opacity: 0.8; }
+    </style>
+</head>
+<body class="w-full h-screen relative">
+
+    <div id="golden-overlay" class="golden-overlay"></div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="ui-layer">
+        <header class="flex justify-between items-start">
+            <div>
+                <h1 class="text-6xl font-black text-yellow-500 mb-2 tracking-tighter drop-shadow-lg">TU<span class="text-yellow-400">L</span>IP</h1>
+                <h2 class="text-3xl font-bold text-slate-200 drop-shadow-md">불가항력적 은혜 <span class="text-xl text-slate-400 font-normal ml-2">은혜의 블랙홀</span></h2>
+            </div>
+            <div class="bg-slate-900 bg-opacity-80 px-6 py-4 rounded-3xl border border-slate-700 backdrop-blur-sm text-right">
+                <p class="text-xl font-bold text-slate-400">접속 중인 심령</p>
+                <p class="text-5xl font-black text-white"><span id="total-players">0</span><span class="text-2xl text-slate-500">명</span></p>
+            </div>
+        </header>
+
+        <!-- 하단 상태 메시지 -->
+        <div class="text-center pb-8">
+            <h3 id="phase-title" class="text-5xl font-black text-white mb-4 phase-text">게임 준비 중</h3>
+            <p id="phase-desc" class="text-2xl font-bold text-slate-300 phase-text">스마트폰을 연결하고 대기해 주세요.</p>
+        </div>
+        
+        <!-- 4단계 항복 메시지 (정중앙 팝업) -->
+        <div id="surrender-msg" class="absolute inset-0 flex flex-col items-center justify-center opacity-0 transition-opacity duration-1000 z-50">
+            <h1 class="text-[8rem] font-black text-white drop-shadow-[0_0_50px_rgba(250,204,21,1)] tracking-widest">완전한 속죄</h1>
+            <p class="text-4xl font-bold text-yellow-300 mt-6 bg-black bg-opacity-50 px-8 py-3 rounded-full border border-yellow-500">우리의 고집을 꺾으시는 하나님의 사랑</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyCfyjgtiDVD4Wsd9iGb9tEdrOGFYxxN2Tw",
+            authDomain: "kingdomgenius.firebaseapp.com",
+            projectId: "kingdomgenius",
+            storageBucket: "kingdomgenius.firebasestorage.app",
+            messagingSenderId: "385557748196",
+            appId: "1:385557748196:web:457b999a38e4982f188ff1"
+        };
+        
+        let app, auth, db, stateDocRef, playersColRef;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            app = initializeApp(JSON.parse(__firebase_config)); db = getFirestore(app);
+            stateDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'tulip_i_state', 'main');
+            playersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'tulip_i_players');
+        } else {
+            app = initializeApp(myFirebaseConfig); db = getFirestore(app);
+            stateDocRef = doc(db, 'kingdom_genius_games', 'tulip_i_room', 'data', 'state');
+            playersColRef = collection(db, 'kingdom_genius_games', 'tulip_i_room', 'players');
+        }
+        auth = getAuth(app);
+
+        let currentPhase = 'lobby';
+        let displayPlayers = {}; // 화면 렌더링용 보간(Lerp) 데이터 객체
+
+        // --- 캔버스 렌더링 설정 ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+
+        const initAuth = async () => {
+            try { await signInAnonymously(auth); setupRealtimeListeners(); } 
+            catch (error) { console.error("Auth error:", error); }
+        };
+        window.addEventListener('DOMContentLoaded', initAuth);
+
+        function setupRealtimeListeners() {
+            onSnapshot(stateDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentPhase = docSnap.data().phase || 'lobby';
+                    updateDisplayPhase();
+                }
+            });
+
+            onSnapshot(playersColRef, (querySnapshot) => {
+                const currentUids = [];
+                querySnapshot.forEach((doc) => { 
+                    const uid = doc.id;
+                    const data = doc.data();
+                    currentUids.push(uid);
+
+                    if (!displayPlayers[uid]) {
+                        // 새 플레이어 진입 시 초기값 
+                        displayPlayers[uid] = { name: data.name, x: data.x || 50, y: data.y || 80, tx: data.x || 50, ty: data.y || 80 };
+                    } else {
+                        // 기존 플레이어 목표 좌표 업데이트
+                        displayPlayers[uid].tx = data.x;
+                        displayPlayers[uid].ty = data.y;
+                    }
+                });
+
+                // 나간 플레이어 삭제
+                Object.keys(displayPlayers).forEach(uid => {
+                    if (!currentUids.includes(uid)) delete displayPlayers[uid];
+                });
+
+                document.getElementById('total-players').innerText = currentUids.length;
+            });
+        }
+
+        // 상태 패널 UI 텍스트 변경
+        function updateDisplayPhase() {
+            const title = document.getElementById('phase-title');
+            const desc = document.getElementById('phase-desc');
+            const overlay = document.getElementById('golden-overlay');
+            const surrenderMsg = document.getElementById('surrender-msg');
+
+            overlay.classList.remove('active');
+            surrenderMsg.classList.remove('opacity-100');
+            surrenderMsg.classList.add('opacity-0');
+
+            switch(currentPhase) {
+                case 'lobby':
+                    title.innerText = "대기 중"; title.className = "text-5xl font-black text-white mb-4 phase-text";
+                    desc.innerText = "스마트폰을 연결하고 기다려주세요.";
+                    break;
+                case 's1':
+                    title.innerText = "자유 의지의 발동"; title.className = "text-5xl font-black text-slate-300 mb-4 phase-text";
+                    desc.innerText = "십자가를 피해 도망치는 영혼들";
+                    break;
+                case 's2':
+                    title.innerText = "희미한 부르심"; title.className = "text-5xl font-black text-blue-400 mb-4 phase-text";
+                    desc.innerText = "은혜의 중력이 발생하기 시작합니다.";
+                    break;
+                case 's3':
+                    title.innerText = "강력한 이끌림"; title.className = "text-5xl font-black text-purple-400 mb-4 phase-text drop-shadow-[0_0_15px_rgba(192,132,252,0.8)]";
+                    desc.innerText = "필사적으로 버티고 저항하지만, 십자가로 끌려갑니다.";
+                    break;
+                case 's4':
+                    title.innerText = ""; desc.innerText = "";
+                    overlay.classList.add('active'); // 황금빛 폭발 배경
+                    
+                    // 약간의 딜레이 후 완전한 속죄 글자 등장
+                    setTimeout(() => {
+                        if(currentPhase === 's4') {
+                            surrenderMsg.classList.remove('opacity-0');
+                            surrenderMsg.classList.add('opacity-100');
+                        }
+                    }, 2000);
+                    break;
+            }
+        }
+
+        // --- 메인 렌더링 루프 (모든 참가자의 하트 애니메이션) ---
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 중앙 십자가 렌더링
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            ctx.save();
+            ctx.translate(cx, cy);
+            
+            // 페이즈별 십자가 이펙트
+            if(currentPhase === 's2') { ctx.shadowBlur = 30; ctx.shadowColor = '#60a5fa'; ctx.fillStyle = '#bfdbfe'; }
+            else if(currentPhase === 's3') { ctx.shadowBlur = 60; ctx.shadowColor = '#c084fc'; ctx.fillStyle = '#e9d5ff'; }
+            else if(currentPhase === 's4') { ctx.shadowBlur = 150; ctx.shadowColor = '#facc15'; ctx.fillStyle = '#fef08a'; }
+            else { ctx.shadowBlur = 0; ctx.fillStyle = '#475569'; }
+
+            // 십자가 모양 (크기 확대)
+            ctx.fillRect(-20, -60, 40, 160); 
+            ctx.fillRect(-60, -20, 120, 40); 
+            ctx.restore();
+
+            // 모든 플레이어 렌더링
+            ctx.font = '24px "Font Awesome 6 Free"';
+            ctx.fontWeight = '900';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            Object.values(displayPlayers).forEach(p => {
+                // 부드러운 움직임을 위한 보간(Lerp) 로직
+                // 스마트폰에서 0.3초마다 쏘는 목표 좌표(tx, ty)를 향해 부드럽게 이동합니다.
+                p.x += (p.tx - p.x) * 0.1;
+                p.y += (p.ty - p.y) * 0.1;
+
+                const px = (p.x / 100) * canvas.width;
+                const py = (p.y / 100) * canvas.height;
+
+                // 하트 그리기
+                ctx.fillStyle = currentPhase === 's4' ? '#fef08a' : '#ef4444'; // 4단계에선 황금색 하트
+                ctx.shadowBlur = currentPhase === 's4' ? 10 : 5;
+                ctx.shadowColor = currentPhase === 's4' ? '#facc15' : '#b91c1c';
+                ctx.fillText('\uf004', px, py);
+
+                // 이름 텍스트 그리기
+                ctx.font = '12px "Noto Sans KR"';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.shadowBlur = 0;
+                ctx.fillText(p.name, px, py + 25);
+                ctx.font = '24px "Font Awesome 6 Free"'; // 폰트 원복
+            });
+
+            requestAnimationFrame(renderLoop);
+        }
+        
+        requestAnimationFrame(renderLoop);
+    </script>
+</body>
+</html>
