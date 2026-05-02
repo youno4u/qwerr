@@ -124,7 +124,11 @@
         .btn-reset { padding:0.9rem; font-size:1rem; font-weight:700;
             font-family:'Noto Sans KR',sans-serif; background:#1e293b;
             color:#64748b; border:1px solid #334155; border-radius:0.8rem; cursor:pointer; }
-        .btn-start:active,.btn-reset:active { transform:scale(0.97); }
+        .btn-replay { padding:0.9rem; font-size:1rem; font-weight:900;
+            font-family:'Noto Sans KR',sans-serif;
+            background:linear-gradient(135deg,#0ea5e9,#0284c7);
+            color:white; border:none; border-radius:0.8rem; cursor:pointer; }
+        .btn-start:active,.btn-reset:active,.btn-replay:active { transform:scale(0.97); }
 
         .player-list { display:flex; flex-direction:column; gap:0.4rem; max-height:260px; overflow-y:auto; }
         .player-list::-webkit-scrollbar { width:3px; }
@@ -232,8 +236,9 @@
         <div class="section-label">게임 제어</div>
         <div class="action-row">
             <button class="btn-start" onclick="startGame()">▶ 게임 시작</button>
-            <button class="btn-reset" onclick="resetGame()">↺ 초기화</button>
+            <button class="btn-reset" onclick="resetGame()">↺ 완전 초기화</button>
         </div>
+        <button class="btn-replay" style="width:100%;" onclick="replayGame()">🔄 다시하기 (대기실로 복귀)</button>
 
         <div class="section-label">접속 중인 심령</div>
         <div class="player-list" id="gm-player-list">
@@ -486,14 +491,19 @@ function setupListeners(){
                 if(rafId){cancelAnimationFrame(rafId);rafId=null;}
                 myName=''; isEliminated=false; hasJoined=false;
                 pos={x:50,y:50}; vel={x:0,y:0}; lastTs=null;
-                listenersSetup=false;  // 재입장 시 리스너 재등록 허용
+                listenersSetup=false;
                 document.getElementById('name-input').value='';
                 showScreen('name-screen');
+            } else if(ns==='lobby'&&(gameStatus==='playing'||gameStatus==='reset'||isEliminated)){
+                // 다시하기 — 탈락자 포함 전원 대기실로
+                if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+                isEliminated=false; vel={x:0,y:0}; lastTs=null;
+                // 랜덤 외곽 위치 재배치
+                const angle=Math.random()*Math.PI*2,r=32+Math.random()*10;
+                pos={x:50+Math.cos(angle)*r,y:50+Math.sin(angle)*r};
+                showScreen('lobby-screen');
             } else if(ns==='playing'&&gameStatus!=='playing'&&!isEliminated){
                 beginPlay();
-            } else if(ns==='lobby'&&(gameStatus==='playing'||gameStatus==='reset')&&!isEliminated){
-                if(rafId){cancelAnimationFrame(rafId);rafId=null;}
-                showScreen('lobby-screen');
             }
         }
         gameStatus=ns;
@@ -515,7 +525,17 @@ function setupListeners(){
 // ── GM 액션 ──────────────────────────────────────────
 window.setPhase=async n=>{currentPhase=n;updateGMPhaseUI(n);await updateDoc(STATE_REF,{phase:n});};
 window.startGame=async()=>{await setDoc(STATE_REF,{gameStatus:'playing',phase:currentPhase},{merge:true});};
-window.resetGame=async()=>{
+window.replayGame=async()=>{
+    // 모든 플레이어 eliminated 초기화 → 대기실로 복귀
+    const snap=await getDocs(PLAYERS_COL);
+    const batch=writeBatch(db);
+    snap.forEach(d=>batch.update(d.ref,{eliminated:false,x:40+Math.random()*20,y:40+Math.random()*20}));
+    await batch.commit();
+    await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
+    // GM 상태 리셋
+    Object.values(allPlayers).forEach(p=>p.eliminated=false);
+    currentPhase=1; updateGMPhaseUI(1); renderGMList();
+};
     if(!confirm('모든 플레이어를 퇴장시키고 완전 초기화합니다. 계속하시겠습니까?'))return;
     // ① 먼저 reset 신호 전파 → 모든 접속 클라이언트가 이름 입력 화면으로 돌아감
     await setDoc(STATE_REF,{gameStatus:'reset',phase:1});
