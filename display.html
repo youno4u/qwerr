@@ -202,6 +202,22 @@ const COLORS=['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#6366f1','#ec48
 let currentPhase=1, gameStatus='lobby';
 let displayPlayers={}, colorIdx=0;
 
+// 5단계 점진적 전환
+const PHASE5_DURATION = 22000;
+let phase5StartTs = null;
+function getCfg(ts){
+    if(currentPhase!==5) return PHASES[currentPhase];
+    if(!phase5StartTs) phase5StartTs=ts;
+    const t=Math.min((ts-phase5StartTs)/PHASE5_DURATION,1.0);
+    const e=t*t*t*t;
+    const a=PHASES[4],b=PHASES[5];
+    return {
+        crossR:a.crossR+(b.crossR-a.crossR)*e,
+        color: t<0.5?a.color:b.color,
+        label: b.label, desc: b.desc,
+    };
+}
+
 const canvas=document.getElementById('game-canvas');
 const ctx=canvas.getContext('2d');
 let W,H;
@@ -226,7 +242,7 @@ function render(ts){
         ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2); ctx.fill();
     });
 
-    const cfg=PHASES[currentPhase];
+    const cfg=getCfg(ts);
     const cx=W/2,cy=H/2,S=Math.min(W,H);
     const cp=(cfg.crossR/100)*S;
 
@@ -235,12 +251,14 @@ function render(ts){
     g.addColorStop(0,cfg.color+'40'); g.addColorStop(1,'transparent');
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
-    // 5단계 파동
+    // 5단계 파동 (점진적)
     if(currentPhase===5){
+        const tP=phase5StartTs?Math.min((ts-phase5StartTs)/PHASE5_DURATION,1.0):0;
+        const wA=tP*0.55;
         const w=(ts/650)%1;
         ctx.save();
-        ctx.strokeStyle=`rgba(250,204,21,${0.55-w*0.55})`;
-        ctx.lineWidth=4; ctx.shadowBlur=30; ctx.shadowColor='#facc15';
+        ctx.strokeStyle=`rgba(250,204,21,${wA-w*wA})`;
+        ctx.lineWidth=2+tP*3; ctx.shadowBlur=30*tP; ctx.shadowColor='#facc15';
         ctx.beginPath(); ctx.arc(cx,cy,cp*0.85+w*S*0.52,0,Math.PI*2); ctx.stroke();
         ctx.restore();
     }
@@ -325,6 +343,7 @@ function setupListeners(){
         const d=snap.data();
         const ns=d.gameStatus||'lobby', np=d.phase||1;
         currentPhase=np;
+        if(np===5) phase5StartTs=null;  // 전환 타이머 리셋
 
         // 페이즈 표시 업데이트
         const cfg=PHASES[np];
