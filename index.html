@@ -310,6 +310,28 @@ let pos={x:50,y:50}, vel={x:0,y:0};
 let lastTs=null, rafId=null, lastSync=0;
 let allPlayers={}, colorIdx=0;
 
+// 5단계 점진적 전환
+const PHASE5_DURATION = 22000; // 22초에 걸쳐 서서히 5단계로
+let phase5StartTs = null;      // 5단계 시작 타임스탬프
+
+// 현재 실제 물리 설정값 반환 (5단계 전환 중이면 보간값)
+function getCfg(ts){
+    if(currentPhase !== 5) return PHASES[currentPhase];
+    if(!phase5StartTs) phase5StartTs = ts;
+    const t = Math.min((ts - phase5StartTs) / PHASE5_DURATION, 1.0);
+    // easeInQuart — 초반엔 거의 4단계, 후반으로 갈수록 급격히 5단계
+    const e = t * t * t * t;
+    const a = PHASES[4], b = PHASES[5];
+    return {
+        pull:  a.pull  + (b.pull  - a.pull)  * e,
+        damp:  a.damp  + (b.damp  - a.damp)  * e,
+        crossR:a.crossR+ (b.crossR- a.crossR)* e,
+        elimR: a.elimR + (b.elimR - a.elimR) * e,
+        color: t < 0.5 ? a.color : b.color,  // 중간에 색 전환
+        label: b.label,
+    };
+}
+
 const canvas = document.getElementById('game-canvas');
 const ctx    = canvas.getContext('2d');
 function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
@@ -344,7 +366,7 @@ function gameLoop(ts){
     if(!lastTs)lastTs=ts;
     const dt=Math.min((ts-lastTs)/16.67,3); lastTs=ts;
     const W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,S=Math.min(W,H);
-    const cfg=PHASES[currentPhase];
+    const cfg=getCfg(ts);  // 5단계 전환 중이면 보간값 사용
 
     ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
 
@@ -353,10 +375,13 @@ function gameLoop(ts){
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
     if(currentPhase===5){
+        // 전환 진행도에 따라 파동 강도 점점 증가
+        const tProgress = phase5StartTs ? Math.min((ts-phase5StartTs)/PHASE5_DURATION,1.0) : 0;
+        const waveAlpha = tProgress * 0.55;
         const w=(ts/600)%1;
         ctx.save();
-        ctx.strokeStyle=`rgba(250,204,21,${0.5-w*0.5})`;
-        ctx.lineWidth=3; ctx.shadowBlur=25; ctx.shadowColor='#facc15';
+        ctx.strokeStyle=`rgba(250,204,21,${(waveAlpha - w*waveAlpha)})`;
+        ctx.lineWidth=2+tProgress*2; ctx.shadowBlur=25*tProgress; ctx.shadowColor='#facc15';
         ctx.beginPath(); ctx.arc(cx,cy,(cfg.crossR/100)*S*0.9+w*S*0.5,0,Math.PI*2); ctx.stroke();
         ctx.restore();
     }
@@ -483,6 +508,8 @@ function setupListeners(){
         if(np!==currentPhase){
             currentPhase=np; updatePhaseBanner(currentPhase);
             if(isGM)updateGMPhaseUI(currentPhase);
+            // 5단계 전환 타이머 리셋
+            if(np===5) phase5StartTs=null;
             if(gameStatus==='playing'){canvas.style.filter='brightness(2) saturate(2)';setTimeout(()=>{canvas.style.filter='';},200);}
         }
         if(!isGM){
