@@ -26,7 +26,7 @@
         <div class="w-full max-w-sm flex flex-col items-center">
             <label class="text-gray-400 mb-2 font-bold">나의 이름은?</label>
             <input type="text" id="player-name" class="w-full px-6 py-4 rounded-xl text-black font-bold text-2xl text-center mb-6 focus:outline-none focus:ring-4 focus:ring-yellow-400" placeholder="이름 입력" maxlength="8">
-            <button onclick="joinGame()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-2xl rounded-xl shadow-lg transition">입장하기</button>
+            <button onclick="window.joinGame()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-2xl rounded-xl shadow-lg transition">입장하기</button>
         </div>
 
         <div id="loading-msg" class="mt-6 text-yellow-400 animate-pulse hidden-safe">서버에 연결 중입니다...</div>
@@ -67,17 +67,17 @@
     <!-- GM 비밀번호 모달 -->
     <div id="gm-password-modal" class="absolute inset-0 flex items-center justify-center z-[100] bg-black/80 hidden-safe p-6">
         <div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 w-full max-w-sm text-center">
-            <h2 class="text-2xl font-bold text-white mb-4">관리자 인증</h2>
+            <h2 class="text-2xl font-bold text-white mb-4">진행자(GM) 인증</h2>
             <input type="password" id="gm-password-input" class="w-full px-4 py-3 rounded text-black text-center text-xl mb-4" placeholder="비밀번호">
             <div class="flex gap-2">
-                <button onclick="hideGmModal()" class="flex-1 py-3 bg-gray-600 rounded font-bold text-white">취소</button>
-                <button onclick="checkGmPassword()" class="flex-1 py-3 bg-red-600 rounded font-bold text-white">확인</button>
+                <button onclick="window.hideGmModal()" class="flex-1 py-3 bg-gray-600 rounded font-bold text-white">취소</button>
+                <button onclick="window.checkGmPassword()" class="flex-1 py-3 bg-red-600 rounded font-bold text-white">확인</button>
             </div>
         </div>
     </div>
 
     <!-- GM 톱니바퀴 (우측 하단 숨김) -->
-    <button onclick="showGmModal()" class="absolute bottom-4 right-4 text-gray-800 hover:text-gray-600 z-50 p-2">
+    <button onclick="window.showGmModal()" class="absolute bottom-4 right-4 text-gray-800 hover:text-gray-600 z-50 p-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
 
@@ -85,7 +85,7 @@
     <div id="gm-view" class="absolute inset-0 bg-gray-900 p-6 hidden-safe z-[60] overflow-y-auto">
         <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
             <h1 class="text-3xl font-black text-red-400">👑 진행자 패널</h1>
-            <button onclick="closeGmView()" class="px-4 py-2 bg-gray-700 rounded font-bold">닫기</button>
+            <button onclick="window.closeGmView()" class="px-4 py-2 bg-gray-700 rounded font-bold">닫기</button>
         </div>
         
         <div class="bg-gray-800 p-6 rounded-xl mb-6 shadow-lg border border-gray-600">
@@ -100,42 +100,110 @@
             </div>
             
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="gmStartRound()" class="p-4 bg-green-600 hover:bg-green-500 rounded font-bold text-xl shadow">▶️ 라운드 시작</button>
-                <button onclick="gmEndRound()" class="p-4 bg-yellow-600 hover:bg-yellow-500 rounded font-bold text-xl shadow">⏹️ 라운드 강제종료</button>
+                <button onclick="window.gmStartRound()" class="p-4 bg-green-600 hover:bg-green-500 rounded font-bold text-xl shadow">▶️ 라운드 시작</button>
+                <button onclick="window.gmEndRound()" class="p-4 bg-yellow-600 hover:bg-yellow-500 rounded font-bold text-xl shadow">⏹️ 라운드 강제종료</button>
             </div>
         </div>
 
         <div class="bg-red-900/30 p-6 rounded-xl border border-red-800 mt-8">
             <h2 class="text-xl font-bold mb-4 text-red-400">데이터 관리</h2>
-            <button onclick="gmClearLeaderboard()" class="w-full p-4 bg-red-700 hover:bg-red-600 rounded font-bold text-lg shadow">🗑️ 전체 랭킹 기록 삭제</button>
+            <button onclick="window.gmClearLeaderboard()" class="w-full p-4 bg-red-700 hover:bg-red-600 rounded font-bold text-lg shadow">🗑️ 전체 랭킹 기록 삭제</button>
         </div>
     </div>
 
-    <!-- Firebase SDK & Logic -->
+    <!-- 로직 스크립트 -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // ==========================================
+        // 1. UI 이벤트 바인딩 최우선 등록 (스크립트 멈춤 방지)
+        // ==========================================
+        window.showGmModal = () => {
+            document.getElementById('gm-password-input').value = '';
+            document.getElementById('gm-password-input').placeholder = '비밀번호';
+            document.getElementById('gm-password-input').classList.remove('border-red-500', 'border-2');
+            document.getElementById('gm-password-modal').classList.remove('hidden-safe');
+        };
+        
+        window.hideGmModal = () => document.getElementById('gm-password-modal').classList.add('hidden-safe');
+        
+        window.checkGmPassword = () => {
+            const passInput = document.getElementById('gm-password-input');
+            if(passInput.value === '1004') {
+                window.hideGmModal();
+                isGmMode = true;
+                document.getElementById('gm-view').classList.remove('hidden-safe');
+                handleStateChange(); 
+            } else {
+                passInput.value = '';
+                passInput.placeholder = '❌ 비밀번호가 틀렸습니다';
+                passInput.classList.add('border-red-500', 'border-2');
+            }
+        };
+
+        window.closeGmView = () => {
+            isGmMode = false;
+            document.getElementById('gm-view').classList.add('hidden-safe');
+        };
+
+        window.joinGame = () => {
+            const input = document.getElementById('player-name').value.trim();
+            if(!input) return;
+            myName = input;
+            
+            document.getElementById('login-view').classList.add('hidden-safe');
+            initCanvas();
+
+            if (globalState.status === 'playing') {
+                currentPlayId = globalState.startTime;
+                startLocalGame();
+            } else {
+                document.getElementById('waiting-view').classList.remove('hidden-safe');
+            }
+        };
+
+        // ==========================================
+        // 2. Firebase 안전 초기화 및 변수 선언
+        // ==========================================
+        let app, auth, db;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'grace-game-v2';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey":"dummy"}');
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        
+        let firebaseConfig = { apiKey: "dummy" };
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+            }
+        } catch (e) {
+            console.error("Config Parsing Error:", e);
+        }
 
-        const STATE_PATH = `artifacts/${appId}/public/data/gamestate`;
-        const LEADERBOARD_PATH = `artifacts/${appId}/public/data/leaderboard`;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
+
+        // Firestore Strict Path Definitions
+        const STATE_COL = collection(db, 'artifacts', appId, 'public', 'data', 'gamestate');
+        const LEADERBOARD_COL = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+        const mainStateDoc = doc(STATE_COL, 'main');
 
         let currentUser = null;
         let globalState = { status: 'waiting', currentRound: 1, startTime: 0 };
-        
         let myName = "";
         let isAlive = false;
         let survivedTime = 0;
         let isGmMode = false;
-        let currentPlayId = 0; // 게임 시작 타이밍 완벽 동기화용 변수
+        let currentPlayId = 0; 
 
-        async function initAuth() {
+        // ==========================================
+        // 3. 인증 및 서버 통신 (규칙 준수)
+        // ==========================================
+        const initAuth = async () => {
             document.getElementById('loading-msg').classList.remove('hidden-safe');
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -143,8 +211,12 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (error) { console.error("Auth Error", error); }
-        }
+            } catch (error) { 
+                console.error("Auth Error", error); 
+                document.getElementById('loading-msg').innerText = "인증 실패. 플레이는 로컬에서만 진행됩니다.";
+            }
+        };
+        initAuth();
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -153,21 +225,20 @@
                 setupStateListener();
             }
         });
-        initAuth();
 
         function setupStateListener() {
-            onSnapshot(doc(db, STATE_PATH, 'main'), (docSnap) => {
+            if (!currentUser) return;
+            onSnapshot(mainStateDoc, (docSnap) => {
                 if (docSnap.exists()) {
                     globalState = docSnap.data();
                     handleStateChange();
                 } else {
-                    setDoc(doc(db, STATE_PATH, 'main'), { status: 'waiting', currentRound: 1, startTime: 0 });
+                    setDoc(mainStateDoc, { status: 'waiting', currentRound: 1, startTime: 0 }).catch(console.error);
                 }
-            }, e => console.error(e));
+            }, (e) => console.error("Snapshot Error:", e));
         }
 
         function handleStateChange() {
-            // 1. GM 화면 UI 업데이트
             if(isGmMode) {
                 document.getElementById('gm-round-input').value = globalState.currentRound;
                 const statusBox = document.getElementById('gm-status-box');
@@ -183,53 +254,34 @@
                 }
             }
 
-            // 2. 플레이어 화면 제어 로직 (버그 수정됨)
             if (myName !== "") {
                 document.getElementById('ui-round').innerText = globalState.currentRound;
                 
                 if (globalState.status === 'playing') {
-                    // 새로운 게임 ID(startTime)가 감지되면 무조건 시작
                     if (currentPlayId !== globalState.startTime) {
                         currentPlayId = globalState.startTime;
                         startLocalGame();
                     }
                 } else {
-                    // 대기 상태로 전환될 때
-                    if (isAlive) endLocalGame(true); // 강제 종료
+                    if (isAlive) endLocalGame(true);
                     resetToWaiting();
                 }
             }
         }
 
-        window.joinGame = function() {
-            const input = document.getElementById('player-name').value.trim();
-            if(!input) return;
-            myName = input;
-            
-            document.getElementById('login-view').classList.add('hidden-safe');
-            initCanvas();
-
-            // 접속 시 이미 게임이 진행 중이라면 즉시 합류
-            if (globalState.status === 'playing') {
-                currentPlayId = globalState.startTime;
-                startLocalGame();
-            } else {
-                document.getElementById('waiting-view').classList.remove('hidden-safe');
-            }
-        };
-
         function resetToWaiting() {
             document.getElementById('gameCanvas').classList.add('hidden-safe');
             document.getElementById('ingame-ui').classList.add('hidden-safe');
             
-            // 만약 죽어서 결과 화면을 보고 있다면 덮어씌우지 않음
             if(!document.getElementById('dead-view').classList.contains('hidden-safe')) {
                 return;
             }
             document.getElementById('waiting-view').classList.remove('hidden-safe');
         }
 
-        // ================== 캔버스/게임 로직 ==================
+        // ==========================================
+        // 4. 게임 캔버스 로직
+        // ==========================================
         let canvas, ctx, width, height;
         let playerObj = { x: 0, y: 0, vx: 0, vy: 0, radius: 25, emoji: '❤️' };
         let graceObj = { x: 0, y: 0, radius: 40, basePull: 0.1, currentPull: 0.1, sizeMultiplier: 1 };
@@ -348,7 +400,7 @@
             
             if(!isForced && currentUser) {
                 try {
-                    await addDoc(collection(db, LEADERBOARD_PATH), {
+                    await addDoc(LEADERBOARD_COL, {
                         name: myName,
                         time: survivedTime,
                         round: globalState.currentRound,
@@ -368,54 +420,34 @@
             }
         }
 
-        // ================== GM 제어 ==================
-        window.showGmModal = () => {
-            document.getElementById('gm-password-input').value = '';
-            document.getElementById('gm-password-modal').classList.remove('hidden-safe');
-        };
-        window.hideGmModal = () => document.getElementById('gm-password-modal').classList.add('hidden-safe');
-        
-        window.checkGmPassword = () => {
-            if(document.getElementById('gm-password-input').value === '1004') {
-                hideGmModal();
-                isGmMode = true;
-                document.getElementById('gm-view').classList.remove('hidden-safe');
-                handleStateChange(); 
-            } else {
-                alert("비밀번호가 틀렸습니다.");
-                hideGmModal();
-            }
-        };
-        window.closeGmView = () => {
-            isGmMode = false;
-            document.getElementById('gm-view').classList.add('hidden-safe');
-        };
-
+        // ==========================================
+        // 5. GM 관리 로직 연동
+        // ==========================================
         window.gmStartRound = async () => {
             if (!currentUser) return;
             const round = parseInt(document.getElementById('gm-round-input').value) || 1;
-            await setDoc(doc(db, STATE_PATH, 'main'), {
+            await setDoc(mainStateDoc, {
                 status: 'playing',
                 currentRound: round,
-                startTime: Date.now() // 이 값이 변경되어야 모든 클라이언트가 시작을 인지함
+                startTime: Date.now()
             });
         };
 
         window.gmEndRound = async () => {
             if (!currentUser) return;
-            await setDoc(doc(db, STATE_PATH, 'main'), {
+            await setDoc(mainStateDoc, {
                 status: 'waiting',
                 currentRound: globalState.currentRound,
                 startTime: 0
             }, { merge: true });
         };
 
-        window.gmClearLeaderboard = async () => {
+        window.gmClearLeaderboard = () => {
             document.getElementById('gm-view').innerHTML += `
                 <div id="clear-confirm" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[100]">
                     <p class="text-white text-2xl font-bold mb-8">모든 랭킹 기록을 삭제합니까?</p>
                     <div class="flex gap-4">
-                        <button onclick="executeClear()" class="px-8 py-4 bg-red-600 rounded font-bold text-white">삭제</button>
+                        <button onclick="window.executeClear()" class="px-8 py-4 bg-red-600 rounded font-bold text-white">삭제</button>
                         <button onclick="document.getElementById('clear-confirm').remove()" class="px-8 py-4 bg-gray-600 rounded font-bold text-white">취소</button>
                     </div>
                 </div>
@@ -423,12 +455,16 @@
         };
 
         window.executeClear = async () => {
-            document.getElementById('clear-confirm').remove();
+            const confirmBox = document.getElementById('clear-confirm');
+            if(confirmBox) confirmBox.remove();
+            
             if (!currentUser) return;
-            const snapshot = await getDocs(collection(db, LEADERBOARD_PATH));
-            const promises = [];
-            snapshot.forEach(d => promises.push(deleteDoc(doc(db, LEADERBOARD_PATH, d.id))));
-            await Promise.all(promises);
+            try {
+                const snapshot = await getDocs(LEADERBOARD_COL);
+                const promises = [];
+                snapshot.forEach(d => promises.push(deleteDoc(doc(LEADERBOARD_COL, d.id))));
+                await Promise.all(promises);
+            } catch(e) { console.error("초기화 에러", e); }
         };
     </script>
 </body>
