@@ -3,200 +3,370 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>불가항력적 은혜 - 송출 대시보드</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>TULIP: 불가항력적 은혜 — 송출</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        body { 
-            margin: 0; 
-            /* 제한적 속죄 테마를 연상시키는 깊고 어두운 그라데이션 배경 */
-            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-            overflow: hidden; 
-            font-family: 'Noto Sans KR', sans-serif; 
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body {
+            font-family:'Noto Sans KR',sans-serif;
+            background:#070d1a; color:white;
+            overflow:hidden; width:100vw; height:100vh;
         }
-        @keyframes dramatic-pulse {
-            0% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.2); border-color: rgba(220, 38, 38, 0.4); }
-            50% { box-shadow: 0 0 50px rgba(220, 38, 38, 0.6); border-color: rgba(220, 38, 38, 0.9); }
-            100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.2); border-color: rgba(220, 38, 38, 0.4); }
+
+        /* ── 레이아웃: 캔버스(왼) + 명단(오) ── */
+        #root {
+            display:grid;
+            grid-template-columns: 1fr 260px;
+            height:100vh;
         }
-        .playing-mode { animation: dramatic-pulse 1.5s infinite; }
-        
-        @keyframes text-glow {
-            0% { text-shadow: 0 0 10px #facc15; }
-            50% { text-shadow: 0 0 30px #facc15, 0 0 40px #eab308; }
-            100% { text-shadow: 0 0 10px #facc15; }
+
+        /* ── 게임 필드 ── */
+        #field {
+            position:relative; overflow:hidden; background:#070d1a;
         }
-        .title-glow { animation: text-glow 2s infinite; }
-        
-        /* 스크롤바 숨기기 (더 깔끔한 UI를 위해) */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        #game-canvas { display:block; width:100%; height:100%; }
+
+        /* 페이즈 텍스트 (하단 중앙) */
+        #phase-display {
+            position:absolute; bottom:1.8rem; left:50%; transform:translateX(-50%);
+            text-align:center; pointer-events:none;
+        }
+        #phase-label {
+            font-size:1.8rem; font-weight:900;
+            text-shadow:0 0 20px currentColor;
+            transition:color 0.6s; white-space:nowrap;
+        }
+        #phase-desc { font-size:0.95rem; color:rgba(255,255,255,0.4); margin-top:0.3rem; }
+
+        /* 상단 제목 (왼쪽 필드에 overlay) */
+        #field-header {
+            position:absolute; top:1.2rem; left:1.5rem;
+            pointer-events:none;
+        }
+        .field-title { font-size:2.2rem; font-weight:900; color:#eab308;
+            text-shadow:0 0 30px rgba(234,179,8,0.5); letter-spacing:-1px; }
+        .field-sub   { font-size:0.85rem; color:#334155; margin-top:1px; font-weight:400; }
+
+        /* 5단계 황금 플래시 */
+        #golden-flash {
+            position:absolute; inset:0;
+            background:radial-gradient(circle,rgba(250,204,21,0.22) 0%,transparent 70%);
+            opacity:0; pointer-events:none; transition:opacity 1.5s ease;
+        }
+        #golden-flash.active { opacity:1; }
+
+        /* 로비 오버레이 */
+        #lobby-overlay {
+            position:absolute; inset:0;
+            background:rgba(7,13,26,0.90); backdrop-filter:blur(4px);
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center; gap:0.8rem;
+        }
+        #lobby-overlay.hidden { display:none; }
+        .lobby-logo { font-size:5rem; font-weight:900; color:#eab308;
+            text-shadow:0 0 50px rgba(234,179,8,0.4); letter-spacing:-3px; }
+        .lobby-msg  { font-size:1.1rem; color:#475569; text-align:center; }
+        #lobby-count { font-size:2rem; font-weight:900; color:#1e293b; margin-top:0.3rem; }
+
+        /* ── 오른쪽 명단 패널 ── */
+        #sidebar {
+            background:#0d1526; border-left:1px solid #0f1e38;
+            display:flex; flex-direction:column; overflow:hidden;
+        }
+
+        /* 통계 헤더 */
+        .sidebar-header {
+            padding:1rem 1.2rem; background:#0f172a;
+            border-bottom:1px solid #0f1e38; flex-shrink:0;
+        }
+        .sidebar-title { font-size:1rem; font-weight:900; color:#eab308; margin-bottom:0.6rem; }
+        .mini-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:0.4rem; }
+        .mini-stat { background:#1e293b; border-radius:0.6rem; padding:0.5rem; text-align:center; }
+        .mini-stat-num { font-size:1.4rem; font-weight:900; }
+        .mini-stat-lbl { font-size:0.65rem; color:#475569; margin-top:1px; }
+
+        /* 생존 목록 */
+        .list-section { flex:1; overflow-y:auto; padding:0.8rem; display:flex; flex-direction:column; gap:0.35rem; }
+        .list-section::-webkit-scrollbar { width:3px; }
+        .list-section::-webkit-scrollbar-thumb { background:#1e293b; border-radius:2px; }
+
+        .list-label {
+            font-size:0.65rem; font-weight:700; color:#334155;
+            letter-spacing:0.1em; text-transform:uppercase;
+            padding:0.3rem 0; margin-bottom:0.1rem;
+            border-bottom:1px solid #0f1e38;
+        }
+
+        .player-row {
+            display:flex; align-items:center; gap:0.55rem;
+            padding:0.45rem 0.7rem; border-radius:0.5rem;
+            background:#111827; font-size:0.88rem;
+            animation:slideIn 0.25s ease;
+        }
+        @keyframes slideIn { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+        .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+        .p-name { flex:1; font-weight:700; }
+        .p-badge { font-size:0.7rem; padding:0.15rem 0.45rem; border-radius:0.3rem; font-weight:700; }
+        .badge-alive { background:rgba(74,222,128,0.15); color:#4ade80; }
+        .badge-elim  { background:rgba(250,204,21,0.12); color:#facc15; font-size:0.65rem; }
+
+        .player-row.elim { opacity:0.5; }
+        .player-row.elim .p-name { color:#475569; }
+
+        /* 탈락 구분선 */
+        .elim-divider {
+            display:flex; align-items:center; gap:0.4rem;
+            padding:0.5rem 0.2rem; margin-top:0.2rem;
+        }
+        .elim-divider-line { flex:1; height:1px; background:#1e293b; }
+        .elim-divider-text { font-size:0.65rem; color:#facc15; font-weight:700; }
     </style>
 </head>
-<body class="text-white h-screen flex flex-col p-6">
+<body>
+<div id="root">
 
-    <!-- 헤더 섹션 (상단) -->
-    <header class="flex justify-between items-end pb-4 border-b-2 border-gray-700 mb-6">
-        <div>
-            <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 title-glow mb-2">
-                불가항력적 은혜
-            </h1>
-            <p class="text-xl text-gray-400 tracking-widest font-bold">IRRESISTIBLE GRACE</p>
-        </div>
-        <div class="text-right">
-            <h2 id="screen-round-title" class="text-5xl font-black text-white">데이터 연결 중...</h2>
-        </div>
-    </header>
+    <!-- 게임 필드 -->
+    <div id="field">
+        <canvas id="game-canvas"></canvas>
+        <div id="golden-flash"></div>
 
-    <!-- 메인 레이아웃 (좌측 상태창 / 우측 리더보드 그리드) -->
-    <main class="flex-1 flex gap-6 overflow-hidden">
-        
-        <!-- 좌측: 상태 표시 패널 (1/3 너비) -->
-        <div class="w-1/3 flex flex-col gap-6">
-            <div id="status-card" class="flex-1 flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-gray-700 bg-gray-800/80 shadow-2xl transition-all duration-500">
-                <div id="status-icon" class="text-9xl mb-8">⏳</div>
-                <h3 id="status-title" class="text-4xl font-black text-blue-400 mb-4 text-center">대기 중입니다</h3>
-                <p id="status-desc" class="text-2xl text-gray-300 text-center font-bold break-keep">
-                    학생들은 스마트폰에서 이름을 입력하고<br>입장한 뒤 대기해주세요.
-                </p>
-            </div>
-            
-            <div class="h-48 bg-gray-800/80 rounded-3xl border border-gray-700 p-6 flex flex-col justify-center items-center shadow-lg">
-                <p class="text-gray-400 text-xl font-bold mb-2">이번 라운드 탈락자</p>
-                <p id="death-count" class="text-6xl font-black text-white">0<span class="text-3xl text-gray-500 ml-2">명</span></p>
-            </div>
+        <div id="field-header">
+            <div class="field-title">TULIP</div>
+            <div class="field-sub">불가항력적 은혜 — 은혜의 블랙홀</div>
         </div>
 
-        <!-- 우측: 리더보드 패널 (2/3 너비, 그리드 형태) -->
-        <div class="w-2/3 bg-gray-800/60 rounded-3xl border border-gray-700 p-8 shadow-2xl flex flex-col">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-3xl font-black flex items-center gap-3">
-                    <span class="text-yellow-400">🏆</span> 생존 랭킹 (오래 버틴 순)
-                </h3>
-            </div>
-            
-            <!-- 리더보드 아이템이 다단(Grid)으로 깔끔하게 정렬되는 영역 -->
-            <div id="leaderboard-grid" class="flex-1 grid grid-cols-2 auto-rows-max gap-4 overflow-y-auto pb-10">
-                <div class="col-span-2 text-center text-gray-500 text-2xl mt-32 font-bold">
-                    아직 은혜에 붙잡힌 사람이 없습니다.
-                </div>
+        <div id="phase-display">
+            <div id="phase-label" style="color:#334155;">대기 중</div>
+            <div id="phase-desc">스마트폰을 연결하고 기다려주세요</div>
+        </div>
+
+        <div id="lobby-overlay">
+            <div class="lobby-logo">✝</div>
+            <div class="lobby-msg">선생님이 시작 버튼을 누르면 게임이 시작됩니다</div>
+            <div id="lobby-count"></div>
+        </div>
+    </div>
+
+    <!-- 명단 사이드바 -->
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">✝현황</div>
+            <div class="mini-stats">
+                <div class="mini-stat"><div class="mini-stat-num" id="s-total" style="color:#60a5fa;">0</div><div class="mini-stat-lbl">접속</div></div>
+                <div class="mini-stat"><div class="mini-stat-num" id="s-alive" style="color:#4ade80;">0</div><div class="mini-stat-lbl">생존</div></div>
+                <div class="mini-stat"><div class="mini-stat-num" id="s-elim"  style="color:#facc15;">0</div><div class="mini-stat-lbl">사로잡힘</div></div>
             </div>
         </div>
 
-    </main>
+        <div class="list-section" id="player-list">
+            <div class="list-label">접속 중인 사람</div>
+            <div id="alive-items"></div>
+            <div class="elim-divider" id="elim-divider" style="display:none;">
+                <div class="elim-divider-line"></div>
+                <div class="elim-divider-text">✝ 사로잡힘</div>
+                <div class="elim-divider-line"></div>
+            </div>
+            <div id="elim-items"></div>
+        </div>
+    </div>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+</div>
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'grace-game-v2';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{"apiKey":"dummy"}');
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+<script type="module">
+import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const STATE_PATH = `artifacts/${appId}/public/data/gamestate`;
-        const LEADERBOARD_PATH = `artifacts/${appId}/public/data/leaderboard`;
+const FB = initializeApp({
+    apiKey:"AIzaSyCfyjgtiDVD4Wsd9iGb9tEdrOGFYxxN2Tw",
+    authDomain:"kingdomgenius.firebaseapp.com",
+    projectId:"kingdomgenius",
+    storageBucket:"kingdomgenius.firebasestorage.app",
+    messagingSenderId:"385557748196",
+    appId:"1:385557748196:web:457b999a38e4982f188ff1"
+});
+const auth = getAuth(FB);
+const db   = getFirestore(FB);
+const STATE_REF   = doc(db,'kingdom_genius_games','tulip_ii_room','data','state');
+const PLAYERS_COL = collection(db,'kingdom_genius_games','tulip_ii_room','players');
 
-        let currentRound = 1;
-        let isPlaying = false;
-        let leaderboardData = [];
+const PHASES = [null,
+    {crossR:5, color:'#60a5fa',label:'1단계 — 희미한 끌림',   desc:'심령들이 자유롭게 움직입니다.'},
+    {crossR:11,color:'#a78bfa',label:'2단계 — 은혜의 중력',    desc:'슬슬 끌려오기 시작합니다.'},
+    {crossR:20,color:'#f472b6',label:'3단계 — 강렬한 이끌림',  desc:'버티고 있지만 점점 힘들어집니다.'},
+    {crossR:31,color:'#fb923c',label:'4단계 — 필사적 저항',    desc:'마지막 힘을 다해 버팁니다!'},
+    {crossR:45,color:'#facc15',label:'5단계 — 불가항력!',      desc:'아무도 피할 수 없습니다.'},
+];
+const COLORS=['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#6366f1','#ec4899','#14b8a6','#84cc16','#f43f5e'];
 
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) { console.error("Auth Error", error); }
-        }
+let currentPhase=1, gameStatus='lobby';
+let displayPlayers={}, colorIdx=0;
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) setupListeners();
-        });
-        initAuth();
+const canvas=document.getElementById('game-canvas');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){
+    const f=document.getElementById('field');
+    W=canvas.width=f.clientWidth; H=canvas.height=f.clientHeight;
+}
+window.addEventListener('resize',resize); resize();
 
-        function setupListeners() {
-            onSnapshot(doc(db, STATE_PATH, 'main'), (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    currentRound = data.currentRound;
-                    isPlaying = data.status === 'playing';
-                    updateScreenUI();
-                    renderLeaderboard(); 
-                }
-            });
+// 별
+const STARS=Array.from({length:150},()=>({
+    x:Math.random(),y:Math.random(),
+    r:Math.random()*1.4+0.3,a:Math.random()*0.5+0.1
+}));
 
-            onSnapshot(collection(db, LEADERBOARD_PATH), (snapshot) => {
-                leaderboardData = [];
-                snapshot.forEach(doc => leaderboardData.push({ id: doc.id, ...doc.data() }));
-                leaderboardData.sort((a, b) => b.time - a.time);
-                renderLeaderboard();
-            });
-        }
+// ── 렌더 루프 ─────────────────────────────────────────
+function render(ts){
+    ctx.fillStyle='#070d1a'; ctx.fillRect(0,0,W,H);
 
-        function updateScreenUI() {
-            document.getElementById('screen-round-title').innerHTML = `<span class="text-gray-400 text-3xl mr-2">ROUND</span> ${currentRound}`;
-            
-            const card = document.getElementById('status-card');
-            const icon = document.getElementById('status-icon');
-            const title = document.getElementById('status-title');
-            const desc = document.getElementById('status-desc');
-            
-            if (isPlaying) {
-                card.className = "flex-1 flex flex-col items-center justify-center p-8 rounded-3xl border-4 bg-red-950/50 playing-mode transition-all duration-500";
-                icon.innerText = "🔥";
-                title.className = "text-5xl font-black text-red-400 mb-4 text-center title-glow";
-                title.innerText = "은혜가 추적 중입니다!";
-                desc.className = "text-2xl text-red-200 text-center font-bold break-keep";
-                desc.innerHTML = "끝까지 도망치세요!<br>붙잡히면 이 화면에 이름이 새겨집니다.";
+    STARS.forEach(s=>{
+        ctx.fillStyle=`rgba(255,255,255,${s.a})`;
+        ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2); ctx.fill();
+    });
+
+    const cfg=PHASES[currentPhase];
+    const cx=W/2,cy=H/2,S=Math.min(W,H);
+    const cp=(cfg.crossR/100)*S;
+
+    // 글로우
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,cp*2.8);
+    g.addColorStop(0,cfg.color+'40'); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // 5단계 파동
+    if(currentPhase===5){
+        const w=(ts/650)%1;
+        ctx.save();
+        ctx.strokeStyle=`rgba(250,204,21,${0.55-w*0.55})`;
+        ctx.lineWidth=4; ctx.shadowBlur=30; ctx.shadowColor='#facc15';
+        ctx.beginPath(); ctx.arc(cx,cy,cp*0.85+w*S*0.52,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
+    }
+
+    // 십자가
+    const th=Math.max(cp*0.20,6);
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.shadowBlur=currentPhase>=4?120:50; ctx.shadowColor=cfg.color;
+    ctx.fillStyle=cfg.color;
+    ctx.fillRect(-th/2,-cp,th,cp*2);
+    ctx.fillRect(-cp*0.65,-th/2,cp*1.3,th);
+    ctx.restore();
+
+    // 플레이어 (Lerp)
+    Object.values(displayPlayers).forEach(p=>{
+        if(p.eliminated)return;
+        p.x+=(p.tx-p.x)*0.10; p.y+=(p.ty-p.y)*0.10;
+        const px=(p.x/100)*W, py=(p.y/100)*H;
+
+        ctx.save();
+        ctx.shadowBlur=14; ctx.shadowColor=p.color;
+        ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(px,py+4,8,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=p.color+'cc'; ctx.beginPath(); ctx.arc(px,py-6,5.5,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur=0;
+        const nw=p.name.length*7.5+12;
+        ctx.fillStyle='rgba(0,0,0,0.7)';
+        ctx.beginPath();
+        if(ctx.roundRect)ctx.roundRect(px-nw/2,py+14,nw,15,4); else ctx.rect(px-nw/2,py+14,nw,15);
+        ctx.fill();
+        ctx.fillStyle='white'; ctx.font='bold 9.5px Noto Sans KR';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(p.name,px,py+21.5);
+        ctx.restore();
+    });
+
+    requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ── 명단 렌더 ─────────────────────────────────────────
+function renderList(){
+    const aliveEl=document.getElementById('alive-items');
+    const elimEl =document.getElementById('elim-items');
+    const divider=document.getElementById('elim-divider');
+    aliveEl.innerHTML=''; elimEl.innerHTML='';
+
+    const all=Object.values(displayPlayers);
+    const alive=all.filter(p=>!p.eliminated);
+    const elim =all.filter(p=>p.eliminated);
+
+    alive.forEach(p=>{
+        const div=document.createElement('div');
+        div.className='player-row';
+        div.innerHTML=`<div class="dot" style="background:${p.color}"></div>
+            <span class="p-name">${p.name}</span>
+            <span class="p-badge badge-alive">생존</span>`;
+        aliveEl.appendChild(div);
+    });
+
+    divider.style.display=elim.length?'flex':'none';
+
+    elim.forEach(p=>{
+        const div=document.createElement('div');
+        div.className='player-row elim';
+        div.innerHTML=`<div class="dot" style="background:${p.color}"></div>
+            <span class="p-name">${p.name}</span>
+            <span class="p-badge badge-elim">✝ 사로잡힘</span>`;
+        elimEl.appendChild(div);
+    });
+
+    const total=all.length,elimCnt=elim.length;
+    document.getElementById('s-total').textContent=total;
+    document.getElementById('s-alive').textContent=total-elimCnt;
+    document.getElementById('s-elim').textContent=elimCnt;
+    document.getElementById('lobby-count').textContent=total?`${total}명 대기 중`:'';
+}
+
+// ── Firebase 리스너 ───────────────────────────────────
+function setupListeners(){
+    onSnapshot(STATE_REF,snap=>{
+        if(!snap.exists())return;
+        const d=snap.data();
+        const ns=d.gameStatus||'lobby', np=d.phase||1;
+        currentPhase=np;
+
+        // 페이즈 표시 업데이트
+        const cfg=PHASES[np];
+        document.getElementById('phase-label').textContent=cfg.label;
+        document.getElementById('phase-label').style.color=cfg.color;
+        document.getElementById('phase-desc').textContent=cfg.desc;
+
+        // 5단계 황금 플래시
+        const flash=document.getElementById('golden-flash');
+        if(np===5)flash.classList.add('active'); else flash.classList.remove('active');
+
+        // 로비 오버레이
+        const overlay=document.getElementById('lobby-overlay');
+        if(ns==='playing')overlay.classList.add('hidden'); else overlay.classList.remove('hidden');
+
+        gameStatus=ns;
+    });
+
+    onSnapshot(PLAYERS_COL,snap=>{
+        const uids=new Set();
+        snap.forEach(docSnap=>{
+            const uid=docSnap.id,d=docSnap.data(); uids.add(uid);
+            if(!displayPlayers[uid]){
+                displayPlayers[uid]={
+                    name:d.name, x:d.x||50, y:d.y||50,
+                    tx:d.x||50, ty:d.y||50,
+                    eliminated:d.eliminated||false,
+                    color:COLORS[colorIdx++%COLORS.length]
+                };
             } else {
-                card.className = "flex-1 flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-gray-700 bg-gray-800/80 shadow-2xl transition-all duration-500";
-                icon.innerText = "⏳";
-                title.className = "text-4xl font-black text-blue-400 mb-4 text-center";
-                title.innerText = "대기 중입니다";
-                desc.className = "text-2xl text-gray-300 text-center font-bold break-keep";
-                desc.innerHTML = "학생들은 스마트폰에서 이름을 입력하고<br>입장한 뒤 대기해주세요.";
+                displayPlayers[uid].tx=d.x??displayPlayers[uid].tx;
+                displayPlayers[uid].ty=d.y??displayPlayers[uid].ty;
+                displayPlayers[uid].eliminated=d.eliminated||false;
             }
-        }
+        });
+        Object.keys(displayPlayers).forEach(uid=>{if(!uids.has(uid))delete displayPlayers[uid];});
+        renderList();
+    });
+}
 
-        function renderLeaderboard() {
-            const grid = document.getElementById('leaderboard-grid');
-            grid.innerHTML = '';
-            
-            const currentRoundData = leaderboardData.filter(d => d.round === currentRound);
-            document.getElementById('death-count').innerHTML = `${currentRoundData.length}<span class="text-3xl text-gray-500 ml-2">명</span>`;
-
-            if (currentRoundData.length === 0) {
-                grid.innerHTML = '<div class="col-span-2 text-center text-gray-500 text-3xl mt-32 font-bold">아직 붙잡힌 사람이 없습니다.</div>';
-                return;
-            }
-
-            // 최대 상위 60명 렌더링 (2열 그리드라 많이 들어감)
-            currentRoundData.slice(0, 60).forEach((entry, index) => {
-                let bgStyle = "bg-gray-700/40 border-gray-600";
-                let textStyle = "text-white";
-                let rankStyle = "text-gray-400";
-                
-                // 1~3등 특별 강조 (제한적 속죄 스타일)
-                if (index === 0) { bgStyle = "bg-yellow-900/40 border-yellow-500"; rankStyle = "text-yellow-400 font-black"; }
-                else if (index === 1) { bgStyle = "bg-gray-600/60 border-gray-400"; rankStyle = "text-gray-300 font-black"; }
-                else if (index === 2) { bgStyle = "bg-orange-900/40 border-orange-600"; rankStyle = "text-orange-400 font-black"; }
-
-                let item = `
-                    <div class="${bgStyle} border rounded-2xl p-4 flex justify-between items-center transform transition duration-300">
-                        <div class="flex items-center gap-4 truncate">
-                            <span class="text-2xl w-8 text-center ${rankStyle}">${index + 1}</span>
-                            <span class="text-2xl font-bold ${textStyle} truncate max-w-[150px]">${entry.name}</span>
-                        </div>
-                        <span class="text-yellow-400 font-black text-3xl tracking-wide">${entry.time.toFixed(1)}<span class="text-lg text-gray-400 ml-1">초</span></span>
-                    </div>
-                `;
-                grid.innerHTML += item;
-            });
-        }
-    </script>
+// ── 인증 ──────────────────────────────────────────────
+try{ await signInAnonymously(auth); setupListeners(); }catch(e){console.error(e);}
+</script>
 </body>
 </html>
