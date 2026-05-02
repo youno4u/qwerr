@@ -8,7 +8,6 @@
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a202c; touch-action: none; font-family: 'Malgun Gothic', sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; }
-        .modal { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); }
         .hidden-safe { display: none !important; }
         @keyframes pulse-glow {
             0% { text-shadow: 0 0 10px #fbbf24; }
@@ -33,7 +32,7 @@
         <div id="loading-msg" class="mt-6 text-yellow-400 animate-pulse hidden-safe">서버에 연결 중입니다...</div>
     </div>
 
-    <!-- 대기 화면 (입장 후) -->
+    <!-- 대기 화면 -->
     <div id="waiting-view" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-gray-900 p-6 hidden-safe text-center">
         <div class="text-6xl mb-6 animate-bounce">❤️</div>
         <h2 class="text-3xl font-bold text-white mb-4">준비 완료!</h2>
@@ -65,7 +64,7 @@
     <canvas id="gameCanvas" class="absolute inset-0 z-10 hidden-safe"></canvas>
 
     <!-- ========================================== -->
-    <!-- GM 비밀번호 모달 (숨김) -->
+    <!-- GM 비밀번호 모달 -->
     <div id="gm-password-modal" class="absolute inset-0 flex items-center justify-center z-[100] bg-black/80 hidden-safe p-6">
         <div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 w-full max-w-sm text-center">
             <h2 class="text-2xl font-bold text-white mb-4">관리자 인증</h2>
@@ -77,7 +76,7 @@
         </div>
     </div>
 
-    <!-- GM 톱니바퀴 (눈에 잘 안 띄게) -->
+    <!-- GM 톱니바퀴 (우측 하단 숨김) -->
     <button onclick="showGmModal()" class="absolute bottom-4 right-4 text-gray-800 hover:text-gray-600 z-50 p-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
@@ -102,7 +101,7 @@
             
             <div class="grid grid-cols-2 gap-4">
                 <button onclick="gmStartRound()" class="p-4 bg-green-600 hover:bg-green-500 rounded font-bold text-xl shadow">▶️ 라운드 시작</button>
-                <button onclick="gmEndRound()" class="p-4 bg-yellow-600 hover:bg-yellow-500 rounded font-bold text-xl shadow">⏹️ 라운드 종료 (대기)</button>
+                <button onclick="gmEndRound()" class="p-4 bg-yellow-600 hover:bg-yellow-500 rounded font-bold text-xl shadow">⏹️ 라운드 강제종료</button>
             </div>
         </div>
 
@@ -112,7 +111,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -134,8 +133,8 @@
         let isAlive = false;
         let survivedTime = 0;
         let isGmMode = false;
+        let currentPlayId = 0; // 게임 시작 타이밍 완벽 동기화용 변수
 
-        // Firebase 초기화
         async function initAuth() {
             document.getElementById('loading-msg').classList.remove('hidden-safe');
             try {
@@ -159,20 +158,16 @@
         function setupStateListener() {
             onSnapshot(doc(db, STATE_PATH, 'main'), (docSnap) => {
                 if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    const prevStatus = globalState.status;
-                    globalState = data;
-                    handleStateChange(prevStatus);
+                    globalState = docSnap.data();
+                    handleStateChange();
                 } else {
-                    // 첫 생성
                     setDoc(doc(db, STATE_PATH, 'main'), { status: 'waiting', currentRound: 1, startTime: 0 });
                 }
             }, e => console.error(e));
         }
 
-        // 상태 변경에 따른 플레이어/GM 화면 제어
-        function handleStateChange(prevStatus) {
-            // GM 화면 업데이트
+        function handleStateChange() {
+            // 1. GM 화면 UI 업데이트
             if(isGmMode) {
                 document.getElementById('gm-round-input').value = globalState.currentRound;
                 const statusBox = document.getElementById('gm-status-box');
@@ -188,39 +183,50 @@
                 }
             }
 
-            // 플레이어 로직
+            // 2. 플레이어 화면 제어 로직 (버그 수정됨)
             if (myName !== "") {
                 document.getElementById('ui-round').innerText = globalState.currentRound;
                 
-                if (globalState.status === 'playing' && prevStatus !== 'playing') {
-                    startLocalGame(); // 라운드 시작
-                } else if (globalState.status === 'waiting' && prevStatus === 'playing') {
-                    if (isAlive) endLocalGame(true); // 도중에 강제종료 됨
+                if (globalState.status === 'playing') {
+                    // 새로운 게임 ID(startTime)가 감지되면 무조건 시작
+                    if (currentPlayId !== globalState.startTime) {
+                        currentPlayId = globalState.startTime;
+                        startLocalGame();
+                    }
+                } else {
+                    // 대기 상태로 전환될 때
+                    if (isAlive) endLocalGame(true); // 강제 종료
                     resetToWaiting();
                 }
             }
         }
 
-        // ================== 플레이어 UI 로직 ==================
         window.joinGame = function() {
             const input = document.getElementById('player-name').value.trim();
             if(!input) return;
             myName = input;
             
             document.getElementById('login-view').classList.add('hidden-safe');
-            document.getElementById('waiting-view').classList.remove('hidden-safe');
             initCanvas();
+
+            // 접속 시 이미 게임이 진행 중이라면 즉시 합류
+            if (globalState.status === 'playing') {
+                currentPlayId = globalState.startTime;
+                startLocalGame();
+            } else {
+                document.getElementById('waiting-view').classList.remove('hidden-safe');
+            }
         };
 
         function resetToWaiting() {
             document.getElementById('gameCanvas').classList.add('hidden-safe');
             document.getElementById('ingame-ui').classList.add('hidden-safe');
             
-            if(!isAlive && document.getElementById('dead-view').classList.contains('hidden-safe') === false) {
-                // 사망 화면을 보고 있다면 유지
-            } else {
-                document.getElementById('waiting-view').classList.remove('hidden-safe');
+            // 만약 죽어서 결과 화면을 보고 있다면 덮어씌우지 않음
+            if(!document.getElementById('dead-view').classList.contains('hidden-safe')) {
+                return;
             }
+            document.getElementById('waiting-view').classList.remove('hidden-safe');
         }
 
         // ================== 캔버스/게임 로직 ==================
@@ -237,7 +243,6 @@
             function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
             window.addEventListener('resize', resize); resize();
 
-            // 조작 (터치 & 마우스)
             const handleMove = (x, y) => {
                 if(!isAlive) return;
                 if (lastTouchX !== null && lastTouchY !== null) {
@@ -265,7 +270,6 @@
             isAlive = true;
             survivedTime = 0;
             
-            // 플레이어 구석에서 시작, 은혜는 중앙
             playerObj.x = width * 0.1; playerObj.y = height * 0.1;
             playerObj.vx = 0; playerObj.vy = 0;
             graceObj.x = width / 2; graceObj.y = height / 2;
@@ -285,7 +289,6 @@
             survivedTime = elapsedTime;
             document.getElementById('ui-time').innerText = survivedTime.toFixed(1) + "초";
 
-            // 물리 업데이트
             let roundMultiplier = 1 + (globalState.currentRound * 0.2);
             graceObj.currentPull = graceObj.basePull + (elapsedTime * 0.05 * roundMultiplier);
             graceObj.sizeMultiplier = 1 + (elapsedTime * 0.1 * roundMultiplier);
@@ -302,23 +305,19 @@
             playerObj.vx *= friction; playerObj.vy *= friction;
             playerObj.x += playerObj.vx; playerObj.y += playerObj.vy;
 
-            // 벽 충돌
             if (playerObj.x < playerObj.radius) { playerObj.x = playerObj.radius; playerObj.vx *= -0.5; }
             if (playerObj.x > width - playerObj.radius) { playerObj.x = width - playerObj.radius; playerObj.vx *= -0.5; }
             if (playerObj.y < playerObj.radius) { playerObj.y = playerObj.radius; playerObj.vy *= -0.5; }
             if (playerObj.y > height - playerObj.radius) { playerObj.y = height - playerObj.radius; playerObj.vy *= -0.5; }
 
-            // 잡힘 판정
             let currentGraceRadius = graceObj.radius * graceObj.sizeMultiplier;
             if (dist < playerObj.radius + currentGraceRadius * 0.4) {
                 endLocalGame(false);
                 return;
             }
 
-            // 렌더링
             ctx.fillStyle = '#1a202c'; ctx.fillRect(0, 0, width, height);
 
-            // 은혜(십자가)
             ctx.save();
             ctx.translate(graceObj.x, graceObj.y);
             let gSize = graceObj.radius * graceObj.sizeMultiplier;
@@ -329,7 +328,6 @@
             ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 30; ctx.fillText('✝️', 0, 0);
             ctx.restore();
 
-            // 플레이어(하트)
             ctx.save();
             ctx.translate(playerObj.x, playerObj.y);
             if(Math.abs(playerObj.vx) > 1 || Math.abs(playerObj.vy) > 1) {
@@ -349,7 +347,6 @@
             document.getElementById('ingame-ui').classList.add('hidden-safe');
             
             if(!isForced && currentUser) {
-                // 진짜로 잡혀서 죽은 경우 DB에 기록 저장
                 try {
                     await addDoc(collection(db, LEADERBOARD_PATH), {
                         name: myName,
@@ -362,15 +359,16 @@
                 document.getElementById('result-time').innerText = survivedTime.toFixed(1) + "초";
                 document.getElementById('dead-view').classList.remove('hidden-safe');
                 
-                // 5초 후 자동으로 대기실로 이동
                 setTimeout(() => {
                     document.getElementById('dead-view').classList.add('hidden-safe');
-                    document.getElementById('waiting-view').classList.remove('hidden-safe');
+                    if(globalState.status === 'waiting') {
+                        document.getElementById('waiting-view').classList.remove('hidden-safe');
+                    }
                 }, 5000);
             }
         }
 
-        // ================== GM 제어 로직 ==================
+        // ================== GM 제어 ==================
         window.showGmModal = () => {
             document.getElementById('gm-password-input').value = '';
             document.getElementById('gm-password-modal').classList.remove('hidden-safe');
@@ -382,7 +380,7 @@
                 hideGmModal();
                 isGmMode = true;
                 document.getElementById('gm-view').classList.remove('hidden-safe');
-                handleStateChange(); // UI 갱신
+                handleStateChange(); 
             } else {
                 alert("비밀번호가 틀렸습니다.");
                 hideGmModal();
@@ -399,7 +397,7 @@
             await setDoc(doc(db, STATE_PATH, 'main'), {
                 status: 'playing',
                 currentRound: round,
-                startTime: Date.now()
+                startTime: Date.now() // 이 값이 변경되어야 모든 클라이언트가 시작을 인지함
             });
         };
 
@@ -413,7 +411,6 @@
         };
 
         window.gmClearLeaderboard = async () => {
-            // 커스텀 모달 없이 간단히 처리하되 GM 뷰 안이므로 버튼 디자인으로 명확히 구분
             document.getElementById('gm-view').innerHTML += `
                 <div id="clear-confirm" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[100]">
                     <p class="text-white text-2xl font-bold mb-8">모든 랭킹 기록을 삭제합니까?</p>
@@ -432,319 +429,7 @@
             const promises = [];
             snapshot.forEach(d => promises.push(deleteDoc(doc(db, LEADERBOARD_PATH, d.id))));
             await Promise.all(promises);
-            // alert 대신 UI 표시 생략 (즉시 삭제됨)
         };
-
-    </script>
-</body>
-</html>            </div>
-        </div>
-        
-        <div id="instruction" class="text-center mb-8 animate-pulse">
-            <p class="text-lg font-bold bg-black/50 inline-block px-4 py-2 rounded-full">
-                👆 화면을 <span class="text-red-400">계속 문질러서(스와이프)</span> 도망치세요!<br>
-            </p>
-        </div>
-    </div>
-
-    <!-- 시작 화면 -->
-    <div id="start-screen" class="absolute inset-0 modal flex flex-col items-center justify-center z-50 p-6 text-center">
-        <h1 class="text-5xl font-black mb-4 text-glow text-yellow-400">끝까지 추적하는 사랑</h1>
-        <p class="text-xl mb-8 text-gray-300">
-            화면을 계속 스와이프하여 십자가(은혜)를 피하세요!<br>
-            오래 버틸수록 순위가 높아집니다.<br>
-            <span class="text-red-400 text-sm mt-2 block">* 라운드가 거듭될수록 은혜의 힘이 강해집니다.</span>
-        </p>
-        
-        <div class="mb-6 flex flex-col items-center">
-            <label for="player-name" class="text-gray-400 mb-2 font-bold">참가자 이름</label>
-            <input type="text" id="player-name" class="px-4 py-2 rounded text-black font-bold text-center w-48 pointer-events-auto" placeholder="이름 입력" value="학생1">
-        </div>
-
-        <button id="start-btn" class="px-8 py-4 bg-yellow-500 text-gray-900 font-bold text-2xl rounded-full shadow-[0_0_20px_rgba(234,179,8,0.5)] hover:scale-105 transition transform pointer-events-auto">
-            게임 시작
-        </button>
-    </div>
-
-    <!-- 라운드 결과 화면 -->
-    <div id="round-end-screen" class="absolute inset-0 modal flex flex-col items-center justify-center z-50 p-6 text-center hidden">
-        <h2 class="text-4xl font-bold text-white mb-2" id="round-end-title">라운드 종료</h2>
-        <h1 class="text-6xl font-black mb-6 text-yellow-500 text-glow">은혜에 붙잡힘!</h1>
-        
-        <div class="bg-gray-800 p-6 rounded-2xl border border-gray-600 shadow-xl max-w-md w-full mb-8">
-            <h3 class="text-xl text-gray-400 mb-4 font-bold border-b border-gray-600 pb-2">순위표</h3>
-            <div id="leaderboard" class="flex flex-col gap-3 text-left">
-                <!-- 리더보드 항목이 여기에 추가됨 -->
-            </div>
-        </div>
-
-        <button id="next-round-btn" class="px-8 py-4 bg-blue-500 text-white font-bold text-2xl rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)] hover:scale-105 transition transform pointer-events-auto">
-            다음 라운드 도전
-        </button>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        let width, height;
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        // 게임 상태 및 기록
-        let gameState = 'start'; // start, playing, roundEnd
-        let currentRound = 1;
-        let startTime = 0;
-        let survivedTime = 0;
-        let playerName = "학생1";
-        
-        // 리더보드 데이터 (가짜 데이터 포함)
-        let leaderboardData = [
-            { name: "김은혜", time: 15.2, round: 1 },
-            { name: "이믿음", time: 12.5, round: 1 },
-            { name: "박소망", time: 9.8, round: 1 },
-            { name: "최사랑", time: 5.1, round: 1 }
-        ];
-        
-        // 엔티티
-        let player = { x: 0, y: 0, vx: 0, vy: 0, radius: 25, emoji: '❤️' };
-        let grace = { x: 0, y: 0, radius: 40, basePull: 0.1, currentPull: 0.1, sizeMultiplier: 1 };
-
-        // 입력 처리 (스와이프/드래그)
-        let lastTouchX = null;
-        let lastTouchY = null;
-        let dragSensitivity = 0.2; 
-        const friction = 0.90; // 마찰력
-
-        function handleStart(x, y) {
-            lastTouchX = x;
-            lastTouchY = y;
-        }
-
-        function handleMove(x, y) {
-            if (gameState !== 'playing') return;
-            if (lastTouchX !== null && lastTouchY !== null) {
-                let dx = x - lastTouchX;
-                let dy = y - lastTouchY;
-                player.vx += dx * dragSensitivity;
-                player.vy += dy * dragSensitivity;
-            }
-            lastTouchX = x;
-            lastTouchY = y;
-        }
-
-        function handleEnd() {
-            lastTouchX = null;
-            lastTouchY = null;
-        }
-
-        // 이벤트 리스너 등록
-        window.addEventListener('touchstart', e => handleStart(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
-        window.addEventListener('touchmove', e => {
-            e.preventDefault();
-            handleMove(e.touches[0].clientX, e.touches[0].clientY);
-        }, {passive: false});
-        window.addEventListener('touchend', handleEnd);
-
-        let isMouseDown = false;
-        window.addEventListener('mousedown', e => { isMouseDown = true; handleStart(e.clientX, e.clientY); });
-        window.addEventListener('mousemove', e => { if(isMouseDown) handleMove(e.clientX, e.clientY); });
-        window.addEventListener('mouseup', () => { isMouseDown = false; handleEnd(); });
-
-        // 게임 초기화 및 시작
-        function initRound() {
-            playerName = document.getElementById('player-name').value || "이름없음";
-            
-            // 플레이어 초기 위치 (십자가에서 멀리)
-            player.x = width * 0.1;
-            player.y = height * 0.1;
-            player.vx = 0;
-            player.vy = 0;
-            
-            // 은혜(십자가) 초기 위치 (가운데)
-            grace.x = width / 2;
-            grace.y = height / 2;
-            
-            // 라운드에 따른 난이도 조절
-            // 라운드가 높아질수록 기본 인력이 강해지고, 플레이어의 스와이프 효율은 떨어짐
-            grace.basePull = 0.1 + (currentRound * 0.05);
-            grace.currentPull = grace.basePull;
-            grace.sizeMultiplier = 1;
-            dragSensitivity = Math.max(0.05, 0.2 - (currentRound * 0.02)); 
-
-            document.getElementById('round-display').innerText = currentRound;
-            
-            startTime = Date.now();
-            gameState = 'playing';
-            
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('round-end-screen').classList.add('hidden');
-            document.getElementById('ui-layer').classList.remove('hidden');
-            document.getElementById('instruction').classList.remove('hidden');
-            
-            requestAnimationFrame(gameLoop);
-        }
-
-        // 게임 루프
-        function gameLoop() {
-            if (gameState !== 'playing') return;
-
-            update();
-            draw();
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        function update() {
-            let elapsedTime = (Date.now() - startTime) / 1000;
-            survivedTime = elapsedTime.toFixed(1);
-            document.getElementById('time-display').innerText = survivedTime + "초";
-
-            // 시간에 따른 은혜의 성장 (라운드 배수 적용)
-            let roundMultiplier = 1 + (currentRound * 0.2);
-            
-            if (elapsedTime > 3) document.getElementById('instruction').classList.add('hidden');
-
-            // 십자가가 점점 커지고 강해짐
-            grace.currentPull = grace.basePull + (elapsedTime * 0.05 * roundMultiplier);
-            grace.sizeMultiplier = 1 + (elapsedTime * 0.1 * roundMultiplier);
-
-            // 거리 계산
-            let dxToGrace = player.x - grace.x;
-            let dyToGrace = player.y - grace.y;
-            let distToGrace = Math.sqrt(dxToGrace*dxToGrace + dyToGrace*dyToGrace);
-            
-            if (distToGrace > 0) {
-                // 은혜의 인력 작용 (플레이어를 당김)
-                player.vx -= (dxToGrace / distToGrace) * grace.currentPull;
-                player.vy -= (dyToGrace / distToGrace) * grace.currentPull;
-            }
-
-            // 플레이어 물리 적용
-            player.vx *= friction;
-            player.vy *= friction;
-            player.x += player.vx;
-            player.y += player.vy;
-
-            // 벽 충돌 처리
-            if (player.x < player.radius) { player.x = player.radius; player.vx *= -0.5; }
-            if (player.x > width - player.radius) { player.x = width - player.radius; player.vx *= -0.5; }
-            if (player.y < player.radius) { player.y = player.radius; player.vy *= -0.5; }
-            if (player.y > height - player.radius) { player.y = height - player.radius; player.vy *= -0.5; }
-
-            // 충돌(잡힘) 확인
-            let currentGraceRadius = grace.radius * grace.sizeMultiplier;
-            if (distToGrace < player.radius + currentGraceRadius * 0.4) {
-                triggerSalvation();
-            }
-        }
-
-        function draw() {
-            // 배경
-            ctx.fillStyle = '#1a202c';
-            ctx.fillRect(0, 0, width, height);
-
-            // 은혜(십자가) 그리기 (아래에 그림)
-            ctx.save();
-            ctx.translate(grace.x, grace.y);
-            let gSize = grace.radius * grace.sizeMultiplier;
-            
-            let gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, gSize * 2);
-            gradient.addColorStop(0, 'rgba(253, 224, 71, 0.8)');
-            gradient.addColorStop(0.5, 'rgba(234, 179, 8, 0.3)');
-            gradient.addColorStop(1, 'rgba(234, 179, 8, 0)');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(0, 0, gSize * 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.font = `${gSize * 1.5}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#f59e0b';
-            ctx.shadowBlur = 30;
-            ctx.fillText('✝️', 0, 0);
-            ctx.restore();
-
-            // 플레이어(하트) 그리기 (위에 그림)
-            ctx.save();
-            ctx.translate(player.x, player.y);
-            
-            // 이동 방향으로 꼬리(궤적) 효과
-            if(Math.abs(player.vx) > 1 || Math.abs(player.vy) > 1) {
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(-player.vx * 2, -player.vy * 2);
-                ctx.strokeStyle = 'rgba(255, 99, 132, 0.5)';
-                ctx.lineWidth = 10;
-                ctx.lineCap = 'round';
-                ctx.stroke();
-            }
-
-            ctx.font = `${player.radius * 2}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(player.emoji, 0, 0);
-            ctx.restore();
-        }
-
-        function triggerSalvation() {
-            gameState = 'roundEnd';
-            
-            // 기록 저장
-            leaderboardData.push({
-                name: playerName,
-                time: parseFloat(survivedTime),
-                round: currentRound
-            });
-
-            // 순위 정렬 (오래 버틴 순)
-            leaderboardData.sort((a, b) => b.time - a.time);
-
-            // 리더보드 UI 업데이트
-            const leaderboardEl = document.getElementById('leaderboard');
-            leaderboardEl.innerHTML = ''; // 초기화
-
-            leaderboardData.slice(0, 5).forEach((entry, index) => { // 상위 5명만 표시
-                let isMe = entry.name === playerName && entry.time === parseFloat(survivedTime);
-                let bgColor = isMe ? 'bg-yellow-900/50 border border-yellow-500' : 'bg-gray-700';
-                let rankColor = index === 0 ? 'text-yellow-400' : (index === 1 ? 'text-gray-300' : (index === 2 ? 'text-yellow-700' : 'text-gray-500'));
-                
-                let item = `
-                    <div class="flex justify-between items-center p-3 rounded-lg ${bgColor}">
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl font-black ${rankColor}">${index + 1}</span>
-                            <span class="text-white font-bold text-lg">${entry.name}</span>
-                            <span class="text-xs text-gray-400">(${entry.round}R)</span>
-                        </div>
-                        <span class="text-yellow-400 font-black text-xl">${entry.time.toFixed(1)}초</span>
-                    </div>
-                `;
-                leaderboardEl.innerHTML += item;
-            });
-
-            document.getElementById('ui-layer').classList.add('hidden');
-            document.getElementById('round-end-title').innerText = `${currentRound}라운드 종료`;
-            document.getElementById('round-end-screen').classList.remove('hidden');
-        }
-
-        // 버튼 이벤트
-        document.getElementById('start-btn').addEventListener('click', initRound);
-        document.getElementById('next-round-btn').addEventListener('click', () => {
-            currentRound++;
-            initRound();
-        });
-
-        // 초기 화면 그리기
-        ctx.fillStyle = '#1a202c';
-        ctx.fillRect(0, 0, width, height);
-
     </script>
 </body>
 </html>
