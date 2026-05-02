@@ -481,8 +481,17 @@ function setupListeners(){
             if(gameStatus==='playing'){canvas.style.filter='brightness(2) saturate(2)';setTimeout(()=>{canvas.style.filter='';},200);}
         }
         if(!isGM){
-            if(ns==='playing'&&gameStatus!=='playing'&&!isEliminated){beginPlay();}
-            else if(ns==='lobby'&&gameStatus==='playing'&&!isEliminated){
+            if(ns==='reset'){
+                // 완전 리셋 — 이름 입력 화면으로 되돌아감
+                if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+                myName=''; isEliminated=false; hasJoined=false;
+                pos={x:50,y:50}; vel={x:0,y:0}; lastTs=null;
+                listenersSetup=false;  // 재입장 시 리스너 재등록 허용
+                document.getElementById('name-input').value='';
+                showScreen('name-screen');
+            } else if(ns==='playing'&&gameStatus!=='playing'&&!isEliminated){
+                beginPlay();
+            } else if(ns==='lobby'&&(gameStatus==='playing'||gameStatus==='reset')&&!isEliminated){
                 if(rafId){cancelAnimationFrame(rafId);rafId=null;}
                 showScreen('lobby-screen');
             }
@@ -507,10 +516,17 @@ function setupListeners(){
 window.setPhase=async n=>{currentPhase=n;updateGMPhaseUI(n);await updateDoc(STATE_REF,{phase:n});};
 window.startGame=async()=>{await setDoc(STATE_REF,{gameStatus:'playing',phase:currentPhase},{merge:true});};
 window.resetGame=async()=>{
-    if(!confirm('모든 플레이어를 삭제하고 초기화합니다. 계속하시겠습니까?'))return;
-    const snap=await getDocs(PLAYERS_COL);
-    const batch=writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
-    await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
+    if(!confirm('모든 플레이어를 퇴장시키고 완전 초기화합니다. 계속하시겠습니까?'))return;
+    // ① 먼저 reset 신호 전파 → 모든 접속 클라이언트가 이름 입력 화면으로 돌아감
+    await setDoc(STATE_REF,{gameStatus:'reset',phase:1});
+    // ② 1초 후 플레이어 문서 전체 삭제
+    setTimeout(async()=>{
+        const snap=await getDocs(PLAYERS_COL);
+        const batch=writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
+        // ③ 상태를 lobby로 전환
+        await setDoc(STATE_REF,{gameStatus:'lobby',phase:1});
+    },1000);
+    // GM 자체 상태 리셋
     allPlayers={}; colorIdx=0; currentPhase=1; updateGMPhaseUI(1); renderGMList();
 };
 window.exitGM=()=>{isGM=false;showScreen('name-screen');};
